@@ -10,6 +10,7 @@
 
 # R version 4.2.2
 library(dplyr) # dplyr_1.1.0
+library(tidyverse) # tidyverse 2.0.0
 import::from(magrittr, "%>%") # magrittr_2.0.3
 # library(tidyr) 
 
@@ -113,4 +114,4 @@ nrow(dart_filtered_with_climate_and_performance_filtered)
 # 2.3% of pixels removed because of poor bsts model fit
 
 # Save outputs
-write.csv(dart_filtered_with_climate_and_performance_filtered, out_file, row.name = FALSE)
+write.csv(dart_filtered_with_climate_and_performance_filtered, out_file, row.names = FALSE)

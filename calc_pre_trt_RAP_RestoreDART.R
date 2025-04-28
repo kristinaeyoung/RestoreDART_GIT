@@ -1,6 +1,4 @@
-#dart <- read.csv('/project/aeroldc/RestoreDART/DART_running/trt_effects_post_trt_all_RestoreDART.csv', header = T)
-# in this case the dart df is the same as trt_effects 
-# trt_effects = dart
+trt_effects <- read.csv('../RestoreDART_DATA/PRE_TREATMENT/trt_effects_all_RestoreDART.csv', header = T)
 
 # Filter to only 5 years before treatment (i.e., year.index between -6 and -1)
 trt_effects_filtered <- trt_effects |> 
