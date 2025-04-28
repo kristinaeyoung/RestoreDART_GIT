@@ -4,7 +4,7 @@
 #          order to make mixed effects models in another script.
 # TODO: 1. add in soil variables
 #       2. add in topographic variables
-#       3. add in pre-treatment cover
+#       3. add in pre-treatment cover (in calc_pre_trt_RAP_RestoreDART.R)
 #       4. ensure we want to use ecoregion rather than MLRA
 #       5. finish assigning objectives for each land treatment
 
