@@ -1,18 +1,11 @@
 # Kristina Young April 23 2025
-# Purpose: This script combines the pixel-wise point effect output from DART with assigned treatment objectives, climate data,
-#          ecoregion classifications, soil variables, topographic variables, and pre-treatment cover into one data frame in  
-#          order to make mixed effects models in another script.
-# TODO: 1. add in soil variables
-#       2. add in topographic variables
-#       3. add in pre-treatment cover (in calc_pre_trt_RAP_RestoreDART.R)
-#       4. ensure we want to use ecoregion rather than MLRA
-#       5. finish assigning objectives for each land treatment
+# Purpose: This script combines the pixel-wise point effect output from DART with assigned treatment      objectives, climate data, ecoregion classifications. 
+# TODO: 1. ensure we want to use ecoregion rather than MLRA
 
 # R version 4.2.2
 library(dplyr) # dplyr_1.1.0
 library(tidyverse) # tidyverse 2.0.0
 import::from(magrittr, "%>%") # magrittr_2.0.3
-# library(tidyr) 
 
 # File Names
 out_file <- ('../RestoreDART_DATA/MIXED_MODELS/1_combined_filter_input_data.csv')

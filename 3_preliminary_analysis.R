@@ -4,6 +4,15 @@
 
 # R version 4.2.2
 
+# OBJECTIVE 1: DECREASE IN TREE COVER
+# Use an example of decrease tree cover as the objective and tree cover as 
+# the functional group of interest
+decrease_TRE <- combined_data %>%
+  filter(OBJECTIVE == "decrease_TRE", fun_group == "tree_cover")
+
+positive_decrease_TRE <- decrease_TRE %>%
+  filter(YearSinceTrt > 0 & YearSinceTrt <= 10)
+
 ##### OBJECTIVE 1: DECREASE IN TREE COVER
 
 # model with a random slope for YearSinceTrt
@@ -57,8 +66,6 @@ ggplot(model_results, aes(x = reorder(Variable, Estimate), y = Estimate)) +
     panel.grid.major = element_line(size = 0.5),  # Thicker grid lines
   )
 
-
-
 # Generate predictions for fixed effects (YearSinceTrt)
 predicted_values <- ggpredict(model_6, terms = "YearSinceTrt")
 
@@ -89,7 +96,15 @@ tre_test_plot = ggplot(data = positive_decrease_TRE,
 tre_test_plot
 
 
+##### OBJECTIVE 2: INCREASE IN PERENNAIL GRASS AND FORBS
+# Use an example of increase in PFG as the objective and PFG cover as 
+# the functional group of interest
+# georgia replaced dart_filtered with dart_filtered_with_climate_and_performance_filtered
+increase_PFG <- dart_filtered_with_climate_and_performance_filtered %>%
+  filter(OBJECTIVE == "increase_PFG", fun_group == "annual_forb_and_grass_cover")
 
+positive_increase_PFG <- increase_PFG %>%
+  filter(YearSinceTrt > 0 & YearSinceTrt <= 10)
 
 ##### OBJECTIVE 2: INCREASE IN PERENNAIL GRASS AND FORBS
 
