@@ -25,7 +25,8 @@ combined_with_pretreatment <- left_join(
   combined_data,
   pre_treatment |> select(PolyID, target_id, fun_group, mean_cover_5YBT),
   by = c("PolyID", "target_id", "fun_group")
-)
+) |> 
+  mutate(YearSinceTrt = year.index - trtYear)
 
 # Joining with soil variables 
 #  WAITING FOR THIS DATA
