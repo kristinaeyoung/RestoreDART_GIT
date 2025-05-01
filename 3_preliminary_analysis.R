@@ -61,32 +61,37 @@ ggplot(positive_decrease_TRE, aes(x = aridity_bin, y = point.effect, fill = comb
 # model_lmer3 <- lmer(point.effect ~ YearSinceTrt + (1 | PolyID) + (1 + YearSinceTrt | PolyID:target_id), 
 # data = positive_decrease_TRE, REML = FALSE)
 
-model_1 <- lmer(point.effect ~ YearSinceTrt + (1 | PolyID), 
-                data = positive_decrease_TRE, REML = FALSE)
 
-model_2 <- lmer(point.effect ~ YearSinceTrt + (1 | PolyID) + (1 | PolyID:target_id), 
-                data = positive_decrease_TRE, REML = FALSE)
+form0 <- point.effect ~ (1 | target_id/YearsSinceTrt)
 
-model_3 <- lmer(point.effect ~ YearSinceTrt + combined_TREATMENT_ASSIGNMENT + (1 | PolyID) + (1 | PolyID:target_id),  # Explicit nested random effects
-                data = positive_decrease_TRE)
+model_0 <- lmer(formula = form0, data = positive_decrease_TRE, REML = FALSE)
 
-model_4 <- lmer(point.effect ~ YearSinceTrt + combined_TREATMENT_ASSIGNMENT + Aridity + (1 | PolyID) + (1 | PolyID:target_id),  # Explicit nested random effects
-                data = positive_decrease_TRE)
+#model_2 <- lmer(point.effect ~ YearSinceTrt + (1 | PolyID) + (1 | PolyID:target_id), 
+#                data = positive_decrease_TRE, REML = FALSE)
 
-model_5 <- lmer(point.effect ~ YearSinceTrt + combined_TREATMENT_ASSIGNMENT + Aridity + SPEI + (1 | PolyID) + (1 | PolyID:target_id),  # Explicit nested random effects
-                data = positive_decrease_TRE)
+#model_3 <- lmer(point.effect ~ YearSinceTrt + combined_TREATMENT_ASSIGNMENT + (1 | PolyID) + (1 | PolyID:target_id),  # Explicit nested random effects
+#                data = positive_decrease_TRE)
 
-model_6 <- lmer(point.effect ~ YearSinceTrt + combined_TREATMENT_ASSIGNMENT + Aridity + SPEI + us_l4name + (1 | PolyID) + (1 | PolyID:target_id),  # Explicit nested random effects
-                data = positive_decrease_TRE)
+#model_4 <- lmer(point.effect ~ YearSinceTrt + combined_TREATMENT_ASSIGNMENT + Aridity + (1 | PolyID) + (1 | PolyID:target_id),  # Explicit nested random effects
+#                data = positive_decrease_TRE)
 
-model_7 <- lmer(point.effect ~ YearSinceTrt + combined_TREATMENT_ASSIGNMENT + Aridity + SPEI + us_l4name + mean_cover_5YBT + (1 | PolyID) + (1 | PolyID:target_id),  # Explicit nested random effects
-                data = positive_decrease_TRE)
+#model_5 <- lmer(point.effect ~ YearSinceTrt + combined_TREATMENT_ASSIGNMENT + Aridity + SPEI + (1 | PolyID) + (1 | PolyID:target_id),  # Explicit nested random effects
+#                data = positive_decrease_TRE)
 
-AIC(model_1, model_2, model_3, model_4, model_5, model_6, model_7)
+#model_6 <- lmer(point.effect ~ YearSinceTrt + combined_TREATMENT_ASSIGNMENT + Aridity + SPEI + us_l4name + (1 | PolyID) + (1 | PolyID:target_id),  # Explicit nested random effects
+#                data = positive_decrease_TRE)
+
+#model_7 <- lmer(point.effect ~ YearSinceTrt + combined_TREATMENT_ASSIGNMENT + Aridity + SPEI + us_l4name + mean_cover_5YBT + (1 | PolyID) + (1 | PolyID:target_id),  # Explicit nested random effects
+#                data = positive_decrease_TRE)
+
+#AIC(model_1, model_2, model_3, model_4, model_5, model_6, model_7)
 
 summary(model_7)
 plot(model_7)
 qqnorm(residuals(model_7))
+
+#ape::Moran.I
+#stats::acf
 
 library(broom.mixed)
 library(ggplot2)
