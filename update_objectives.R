@@ -42,6 +42,7 @@ if (!isTRUE(all.equal(objs_old$OBJECTIVE, d0_old$OBJECTIVE))) {
     d0_old = d0_old$OBJECTIVE[objs_old$OBJECTIVE != d0_old$OBJECTIVE]
     )
 }
+# per KY, use the new objectives
 
 # leave ONLY the new data in the Global env
 rm(obj_dir, obj_fl, data_file, d0, objs, objs_old, d0_old)
