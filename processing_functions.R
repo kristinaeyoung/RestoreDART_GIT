@@ -9,33 +9,33 @@
 # library(future)
 # library(future.apply)
 # 
-pivot_data <- function(extracted_data) {
-  extracted_data |>
-    tidyr::pivot_longer(
-      cols = -c(ID, x, y),
-      names_to = c("functional_group", "year"),
-      names_pattern = "(.*?)_(\\d{4})_v\\d+",
-      values_to = "cover_value"
-    ) |>
-    dplyr::select(ID, x, y, functional_group, year, cover_value)
-}
+# pivot_data <- function(extracted_data) {
+#   extracted_data |>
+#     tidyr::pivot_longer(
+#       cols = -c(ID, x, y),
+#       names_to = c("functional_group", "year"),
+#       names_pattern = "(.*?)_(\\d{4})_v\\d+",
+#       values_to = "cover_value"
+#     ) |>
+#     dplyr::select(ID, x, y, functional_group, year, cover_value)
+# }
+# # 
+# summarize_data <- function(pivoted_data) {
+#   pivoted_data |>
+#     dplyr::group_by(ID, functional_group, year) |>
+#     dplyr::summarize(cover = mean(cover_value, na.rm = TRUE), .groups = 'drop')
+# }
 # 
-summarize_data <- function(pivoted_data) {
-  pivoted_data |>
-    dplyr::group_by(ID, functional_group, year) |>
-    dplyr::summarize(cover = mean(cover_value, na.rm = TRUE), .groups = 'drop')
-}
-# 
-reshape_top_sims <- function(top_sims) {
-  ref_table <- top_sims$index %>%
-    t() %>%
-    tibble::as_tibble() %>%
-    dplyr::mutate(target = dplyr::row_number()) %>%
-    dplyr::select(target, dplyr::everything()) %>%
-    tidyr::pivot_longer(dplyr::starts_with('V'), names_to = 'refnumber', values_to = 'reference') %>%
-    dplyr::select(-refnumber)
-  return(ref_table)
-}
+# reshape_top_sims <- function(top_sims) {
+#   ref_table <- top_sims$index %>%
+#     t() %>%
+#     tibble::as_tibble() %>%
+#     dplyr::mutate(target = dplyr::row_number()) %>%
+#     dplyr::select(target, dplyr::everything()) %>%
+#     tidyr::pivot_longer(dplyr::starts_with('V'), names_to = 'refnumber', values_to = 'reference') %>%
+#     dplyr::select(-refnumber)
+#   return(ref_table)
+# }
 # 
 # prep_ts <- function(target_id, fun_group, treat_year) {
 #   years <- extracted_target %>%
