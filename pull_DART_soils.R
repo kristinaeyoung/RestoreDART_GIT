@@ -17,6 +17,22 @@ soil_vars <- c('MELTON', 'soilec', 'sand')
 dart_data_folder      <- "../RestoreDART_DATA/RDATA_batch/"
 dart_rdata_folder     <- "../RestoreDART_DATA/RDATA_ID/"
 dart_save_base_folder <- "../RestoreDART_DATA/RDATA_save/"
+refrast_fl            <- "../RestoreDART_DATA/DART_rasters/refrast_conus.tif"
+refrast_fl0           <- "../RestoreDART_DATA/DART_rasters/refrast_UT.tif"
+
+if (!file.exists(refrast_fl0)) {
+  refrast <- terra::rast(refrast_fl)
+  UT <- spData::us_states[which(spData::us_states$NAME == 'Utah'), ]
+  UT <- terra::vect(UT)
+  UT <- terra::project(UT, refrast)
+  refrast <- terra::crop(refrast, UT)
+  refrast <- terra::mask(refrast, UT)
+  terra::writeRaster(refrast, refrast_fl0, overwrite = F)
+  rm(UT, refrast_fl, refrast_fl0)
+} else {
+  refrast <- terra::rast(refrast_fl0)
+  rm(refrast_fl, refrast_fl0)
+}
 
 ### Unzip all batch zips into the flat RData directory (skipping already-extracted files)
 zip_files <- list.files(dart_data_folder, pattern = "\\.zip$", full.names = TRUE)[-1]
@@ -63,15 +79,15 @@ for (id in ids_to_run) {
   polyID   <- padpoly |> sf::st_drop_geometry() |> dplyr::select(polyID)  |> dplyr::mutate(polyID  = as.numeric(polyID))  |> dplyr::pull(polyID)
 
   # re-rasterizing the padpolygon to try and get numbers out of the row names
-  p0 <- padpoly[, 'polyID']
-  p0 <- sf::st_buffer(p0, dist = -1*dpar$innerRad) # from get_treatment
-  p0$rastval <- 1
+  #p0 <- padpoly[, 'polyID']
+  #p0 <- sf::st_buffer(p0, dist = -1*dpar$innerRad) # from get_treatment
+  #p0$rastval <- 1
   # zone is a raster stack of all the masks/etc, can we do it without it?
   # zone is created by getRasterData, requires padpoly, dpar, searchRadius
   # zone should be the same crs as refrast
   #p0 <- terra::rasterize(p0, crop(zone[[1]], p0),field=padpolyi$rastval, datatype='INT1U')
   # zone should be the same crs as refrast, masked by the other layers
-  p0 <- terra::rasterize(p0, refrast)
+  #p0 <- terra::rasterize(p0, refrast)
   #padpolybuf <- st_buffer(padpoly, dist = dpar$rad)
   #padpolybuf$rastval <- 1
   #zone <- crop(b, padpolybuf)
@@ -102,6 +118,22 @@ for (id in ids_to_run) {
   
   #id_c0 <- extraction$extractedTarget[, c('ID', 'x', 'y')]
   #id_c0 <- id_c0[!duplicated(id_c0), ]
+  
+  p0 <- padpixels
+  
+  t0 <- extraction$extractedTarget
+  #t0 <- t0[, c('ID', 'perennial_forb_and_grass_cover_2020_v3', 'x', 'y')]
+  #t0$xy <- paste(round(t0$x), round(t0$y), sep = ', ')
+  t0 <- cbind(t0$ID, t0$x, t0$y, t0[, grepl('bare_ground', colnames(t0))])
+  colnames(t0)[1:3] <- c('ID', 'x', 'y')
+  #t0 <- t0[which(t0$ID == 2), ]
+  # polyID 1066, bare ground 1987-2024, pixel 2
+  #write.csv(t0, '../results/extracted_DART_1066_bare_87_24.csv', row.names = F)
+  #write.csv(p0, '../results/padpixels_1066.csv', row.names = F)
+  
+  g0 <- padpixels$geometry
+  #stopifnot(identical(terra::crs(refrast), sf::st_crs(g0)$wkt))
+  #stopifnot(length(unique(t0$ID)) == length(g0))
   
   break
 
