@@ -57,8 +57,10 @@ polys = geemap.shp_to_ee(shp_file)
 coll_gridmet =  ee.ImageCollection('IDAHO_EPSCOR/GRIDMET')
 
 # select start and end year
-srt_yr = 1980
-end_yr = 2020
+#srt_yr = 1980
+srt_yr = 2021
+#end_yr = 2020
+end_yr = 2024
 
 # filter data based on date range, band, and feature
 precip = coll_gridmet.select('pr')
