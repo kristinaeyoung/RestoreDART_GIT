@@ -6,7 +6,6 @@ df0 <- read.csv(in_fl)
 # drop the one weird NA
 df0 <- df0[!is.na(df0$coarse_trt_group), ]
 
-
 length(unique(df0$coarse_trt_group))
 # 14 coarse treatment groups rather than the ~145 currently
 unique(unlist(strsplit(df0$coarse_trt_group, ';')))
@@ -22,6 +21,5 @@ df0$prescribed_burn <- grepl('prescribed burn', df0$tx_coarse)
 df0$seeding <- grepl('seeding', df0$tx_coarse)
 df0$soil_disturbance <- grepl('soil disturbance', df0$tx_coarse)
 df0$vegetation_removal <- grepl('vegetation removal', df0$tx_coarse)
-
 
 write.csv(df0, '../results/tx_key_BEM.csv', row.names = F)
