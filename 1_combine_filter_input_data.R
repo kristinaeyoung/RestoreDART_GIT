@@ -21,7 +21,7 @@
 # R version 
 library(dplyr)
 
-out_file <- '../RestoreDART_DATA/MIXED_MODELS/1_combined_filter_input_data.csv'
+out_file <- '../RestoreDART_DATA/MIXED_MODELS/1_combined_filter_input_data_14042026.csv'
 tx_key_fl <- '../results/tx_key_BEM.csv'
 
 # import
@@ -129,7 +129,9 @@ dat <- dart |>
   mutate(tx_comb = gsub('^greenstrip$', 'greenstrip_ground seeding', tx_comb)) |>
   # assume 'vegetation removal' is the same as 'vegetation removal_manual'
   mutate(tx_comb = gsub('^vegetation removal$', 'vegetation removal_manual', tx_comb)) |>
-  mutate(year_diff = year_tx - year_RAP)
+  mutate(year_diff = year_tx - year_RAP) |>
+  mutate(sig = lower > 0 | upper < 0) |>
+  mutate(subj = paste(polygon, pixel, sep = '_'))
 
 stopifnot(all(dat$tx_comb %in% tx_key$tx_fine))
 
@@ -144,10 +146,13 @@ unique(dat$tx_coarse) |>
   unlist() |>
   unique()
 
+# what % of data is significant?
+round((table(dat$sig) / length(dat$sig)) * 100, 2)
+
 # re-order columns
 dat <- dat |>
   select(
-    effect, lower, upper, polygon, pixel, fun_group, objective, year_RAP, year_tx, year_diff,
+    effect, lower, upper, sig, polygon, pixel, subj, fun_group, objective, year_RAP, year_tx, year_diff,
     aridity, spei, ELEVm, SLOPE, MELTON, soilec, sand, silt, mean_cover_5YBT, 
     tx_fine, tx_coarse, prescribed_burn, seeding, soil_disturbance, vegetation_removal
   )
