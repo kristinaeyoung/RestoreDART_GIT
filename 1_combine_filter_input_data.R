@@ -8,15 +8,20 @@
 #     * added in missing AI/SPEI data
 #     * added missing DART data
 
+# Assumptions/Considerations:
+#     * 'greenstrip' is the same as'greenstrip_ground seeding'
+#     * 'vegetation removal' is the same as 'vegetation removal_manual'
+#     * 'unknown' treatment dropped, removed 9 polygons and 140 pixels
+#     * filtered by r > 0.5, removed 1% of total observations
+#     * filtered by missing soil/climate, removed 2.9% of total data
+
 # TODO:
-#     * rename this file to 1_make_input_data.R
 #     * update version information on R, dplyr, tidyr
-#     * AI/SPEI script only getting 2/3 of the 2021-2024 data
 
 # R version 
 library(dplyr)
 
-out_file <- '../RestoreDART_DATA/MIXED_MODELS/xx_combined_filter_input_data.csv'
+out_file <- '../RestoreDART_DATA/MIXED_MODELS/1_combined_filter_input_data.csv'
 tx_key_fl <- '../results/tx_key_BEM.csv'
 
 # import
@@ -51,7 +56,7 @@ preformance <- read.csv('../RestoreDART_DATA/MIXED_MODELS/MIXEDMODEL_model_perfo
 ecoregion <- read.csv("../RestoreDART_DATA/SPATIAL_DATA/RestoreDART_projects_with_ecoregion_info.csv", header = T) |>
   select(polyID, us_l4code, us_l4name, trtYear) |>
   rename(PolyID = polyID)
-dart <- read.csv('../RestoreDART_DATA/DART_combined_BEM_04032026.csv')
+dart <- read.csv('../RestoreDART_DATA/MIXED_MODELS/DART_combined_BEM_04032026.csv')
 pre_treatment <- read.csv('../RestoreDART_DATA/PRE_TREATMENT/rap_5ybt_summary.csv', header = T) |>
   select(PolyID, target_id, fun_group, mean_cover_5YBT)
 soil <- read.csv('../RestoreDART_DATA/MIXED_MODELS/xx_soil_df.csv') |>
@@ -100,29 +105,52 @@ dart <- dart |>
   tidyr::drop_na()
 # 15,216,023, 2.9% reduction in total data, but lots missing from 2021-2024
 
+# rename columns
+dat <- dart |>
+  select(-response, -point.pred, -point.pred.lower, -point.pred.upper, -YearSinceTrt, -r) |>
+  select(-PLANC, -PROFC, -SWI, -RELELEV02, -RELELEV16, -RELELEV32, -MODGMRPH, 
+         -VALLEDEP, -NTOPOPEN, -PTOPOPEN, -VDCN, -DVMNED, -TPI, -eastness, -southness,
+         -fragVol, -resdep, -clay, -CAlog_10) |>
+  rename('year_RAP' = year.index, 'year_tx' = trtYear, 'polygon' = PolyID, 'pixel' = target_id,
+         'effect' = point.effect, 'lower' = point.effect.lower, 'upper' = point.effect.upper,
+         'objective' = OBJECTIVE, 'tx_comb' = combined_TREATMENT_ASSIGNMENT,
+         'aridity' = Aridity, 'spei' = SPEI) |>
+  filter_out(fun_group == 'litter_cover') |>
+  mutate(fun_group = gsub('_cover', '', fun_group)) |>
+  mutate(fun_group = gsub('annual_forb_and_grass', 'AFG', fun_group)) |>
+  mutate(fun_group = gsub('perennial_forb_and_grass', 'PFG', fun_group)) |>
+  mutate(fun_group = gsub('bare_ground', 'bare', fun_group)) |>
+  mutate(tx_comb = tolower(tx_comb)) |>
+  # tx_comb which are not in tx_key:
+  # "unknown"            "vegetation removal" "greenstrip"
+  # drop 'unknown', removes 9 polygons and 140 pixels
+  filter_out(tx_comb == 'unknown') |>
+  # assume 'greenstrip' is the same as'greenstrip_ground seeding'
+  mutate(tx_comb = gsub('^greenstrip$', 'greenstrip_ground seeding', tx_comb)) |>
+  # assume 'vegetation removal' is the same as 'vegetation removal_manual'
+  mutate(tx_comb = gsub('^vegetation removal$', 'vegetation removal_manual', tx_comb)) |>
+  mutate(year_diff = year_tx - year_RAP)
 
-#d0$treatment <- tolower(d0$treatment)
-# tx_key is missing a key for 'vegetation removal', which should just be 'vegetation removal'
-#tx_key[nrow(tx_key) + 1, 'tx_fine'] <- 'vegetation removal'
-#tx_key[nrow(tx_key), 'tx_coarse'] <- 'vegetation removal'
-#stopifnot(all(d0$treatment %in% tx_key$tx_fine))
-#colnames(d0)[which(colnames(d0) == 'treatment')] <- 'tx_fine'
-#d0 <- dplyr::left_join(d0, within(tx_key, rm(npoly_coarse, npix_coarse)), by = 'tx_fine')
+stopifnot(all(dat$tx_comb %in% tx_key$tx_fine))
+
+dat <- dat |>
+  rename('tx_fine' = tx_comb) |>
+  left_join(within(tx_key, rm(npoly_coarse, npix_coarse)), by = 'tx_fine')
 
 # how many unique methods?
 # should just be 4
-#v1 <- unique(d0$tx_coarse)
-#v1 <- strsplit(v1, ';')
-#v1 <- unlist(v1)
-#v1 <- unique(v1)
+unique(dat$tx_coarse) |>
+  strsplit(';') |>
+  unlist() |>
+  unique()
 
-# condense objectives into 5 separate models
-#d1 <- d0[grepl('increase_PFG', d0$objective), ]
-#d1 <- d1[grepl('perennial_forb_and_grass_cover', d1$var), ]
-#d1 <- d1[which(d1$years_since_treatment > 0), ]
-# also decrease_AFG, increase_SHR, decrease_SHR, decrease_TRE
-# for combination objectives, how do we decide which go into their own groups?
-
-# each df has a landscape response to restoration for a set of pixels and years within polygons
+# re-order columns
+dat <- dat |>
+  select(
+    effect, lower, upper, polygon, pixel, fun_group, objective, year_RAP, year_tx, year_diff,
+    aridity, spei, ELEVm, SLOPE, MELTON, soilec, sand, silt, mean_cover_5YBT, 
+    tx_fine, tx_coarse, prescribed_burn, seeding, soil_disturbance, vegetation_removal
+  )
 
 # write output file
+write.csv(dat, out_file, row.names = F)
