@@ -1,7 +1,8 @@
 # BEM March 2026
 
-library(brms)
 library(dplyr)
+library(brms)
+library(spdep)
 
 set.seed(1)
 
@@ -12,19 +13,19 @@ set.seed(1)
 in_fl <- '../RestoreDART_DATA/MIXED_MODELS/1_combined_filter_input_data_14042026.csv'
 brms_mod_dir <- '../RestoreDART_DATA/MIXED_MODELS/brms_models'
 
-#dat <- read.csv(in_fl)
-# dat_PFG <- dat |>
-#   filter(fun_group == 'AFG') |>
-#   filter(grepl('increase_PFG', objective)) |>
-#   filter(sig == TRUE) |>
-#   select(-sig) |>
-#   filter(year_diff >= 0) |>
-#   filter(effect > 0) |>
-#   # only two samples of prescribed burn;seeding;soil disturbance
-#   filter_out(tx_coarse == 'prescribed burn;seeding;soil disturbance')
-# write.csv(dat_PFG, '../RestoreDART_DATA/MIXED_MODELS/brms_models/PFG_test_data.csv')
+dat <- read.csv(in_fl)
+dat_PFG <- dat |>
+  filter(fun_group == 'PFG') |>
+  filter(grepl('increase_PFG', objective)) |>
+  filter(sig == TRUE) |>
+  select(-sig) |>
+  filter(year_diff >= 0) |>
+  filter(effect > 0) |>
+  # only two samples of prescribed burn;seeding;soil disturbance
+  filter_out(tx_coarse == 'prescribed burn;seeding;soil disturbance')
+write.csv(dat_PFG, '../RestoreDART_DATA/MIXED_MODELS/brms_models/PFG_test_data.csv')
 
-dat_PFG <- read.csv('../RestoreDART_DATA/MIXED_MODELS/brms_models/PFG_test_data.csv')
+#dat_PFG <- read.csv('../RestoreDART_DATA/MIXED_MODELS/brms_models/PFG_test_data.csv')
 
 # model notes:
 # sig TRUE and effect > 0 works well with a lognormal family
@@ -34,19 +35,28 @@ dat_PFG <- read.csv('../RestoreDART_DATA/MIXED_MODELS/brms_models/PFG_test_data.
 # effect ~ (1 | tx_coarse) fits well, does not account for time
 # effect ~ (1 | tx_coarse/year_diff) doesnt make sense with time as an unordered effect
 f_1 <- brmsformula(effect ~ (1 + year_diff | tx_coarse), family = lognormal())
-
+#load(file.path(brms_mod_dir, 'fit_1_PFG.RData'))
 fit_1 <- brms::brm(formula = f_1, data = dat_PFG, chains = 4, iter = 5000, warmup  = 2000, cores = 4,
-                   control = list(adapt_delta = 0.99))
+                  control = list(adapt_delta = 0.99))
 summary(fit_1)
 pp_check(fit_1, ndraws = 100) 
 pairs(fit_1)
 ranef(fit_1)
 
 # moran's
-#res <- residuals(fit, method = "posterior_predict")[, "Estimate"]
-#Create spatial weights: listw <- nb2listw(neighbors, style = "W")
-#Run test: spdep::moran.test(res, listw).
-
+c_1 <- as.matrix(dat_PFG[, c('X', 'Y')])
+# fuzz the points by +/- 15 m to make sure they aren't identical
+c_1[, 1] <- c_1[, 1] + sample(seq(-15, 15), nrow(c_1), replace = T)
+c_1[, 2] <- c_1[, 2] + sample(seq(-15, 15), nrow(c_1), replace = T)
+# one point that is still identical
+c_1[, 1] <- c_1[, 1] + sample(seq(-1, 1), nrow(c_1), replace = T)
+c_1[, 2] <- c_1[, 2] + sample(seq(-1, 1), nrow(c_1), replace = T)
+knn_1 <- knearneigh(c_1, k = 100)
+knn_1 <- knn2nb(knn_1)
+res_1 <- residuals(fit_1, method = "posterior_predict")[, "Estimate"]
+listw_1 <- nb2listw(knn_1, style = "W")
+moran.test(res_1, listw_1)
+# spatial structure very significant
 
 # fit_2 <- brms::brm(
 #   formula = f_2, data = dat_PFG, chains = 4, iter = 3000, warmup  = 1000, cores = 4

@@ -54,7 +54,7 @@ spei_long <- read.csv('../RestoreDART_DATA/CLIMATE_DATA/Annual_Mean_SPEI_For_DAR
 preformance <- read.csv('../RestoreDART_DATA/MIXED_MODELS/MIXEDMODEL_model_performance_all_RestoreDART.csv', header = T) |>
   select(-nyrs_pretrt, -RMSE, -RelRMSE, -point.effect)
 ecoregion <- read.csv("../RestoreDART_DATA/SPATIAL_DATA/RestoreDART_projects_with_ecoregion_info.csv", header = T) |>
-  select(polyID, us_l4code, us_l4name, trtYear) |>
+  select(polyID, us_l4code, us_l4name) |>
   rename(PolyID = polyID)
 dart <- read.csv('../RestoreDART_DATA/MIXED_MODELS/DART_combined_BEM_04032026.csv')
 pre_treatment <- read.csv('../RestoreDART_DATA/PRE_TREATMENT/rap_5ybt_summary.csv', header = T) |>
@@ -83,6 +83,7 @@ unique(Objectives_filtered$combined_TREATMENT_ASSIGNMENT)
 dart <- dart |>
   filter(PolyID %in% Objectives_filtered$PolyID) |>
   left_join(Objectives_filtered, by = 'PolyID') |>
+  left_join(ecoregion, by = 'PolyID') |>
   left_join(preformance, by = c('PolyID', 'target_id', 'fun_group')) |>
   left_join(pre_treatment, by = c("PolyID", "target_id", "fun_group")) |>
   mutate(PolyID = as.integer(PolyID)) |>
@@ -159,7 +160,7 @@ round((table(dat$sig) / length(dat$sig)) * 100, 2)
 # re-order columns
 dat <- dat |>
   select(
-    effect, lower, upper, sig, polygon, pixel, X, Y, fun_group, objective, year_RAP, year_tx, year_diff,
+    effect, lower, upper, sig, polygon, us_l4name, us_l4code, pixel, X, Y, fun_group, objective, year_RAP, year_tx, year_diff,
     aridity, spei, ELEVm, SLOPE, MELTON, soilec, sand, silt, mean_cover_5YBT, 
     tx_fine, tx_coarse, prescribed_burn, seeding, soil_disturbance, vegetation_removal
   )

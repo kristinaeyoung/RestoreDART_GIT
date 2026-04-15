@@ -7,7 +7,7 @@ library(sf)
 dart_data_folder      <- "../RestoreDART_DATA/RDATA_batch/"
 dart_rdata_folder     <- "../RestoreDART_DATA/RDATA_ID/"
 dart_save_base_folder <- "../RestoreDART_DATA/RDATA_save/"
-d0_fl <- "../RestoreDART_DATA/MIXED_MODELS/1_combined_filter_input_data.csv"
+d0_fl <- "../RestoreDART_DATA/MIXED_MODELS/1_combined_filter_input_data_14042026.csv"
 out_fl <- "../RestoreDART_DATA/MIXED_MODELS/xx_soil_df.csv"
 coord_fl <- "../RestoreDART_DATA/MIXED_MODELS/xx_coord_df.csv"
 
