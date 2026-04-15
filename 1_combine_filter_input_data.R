@@ -61,6 +61,12 @@ pre_treatment <- read.csv('../RestoreDART_DATA/PRE_TREATMENT/rap_5ybt_summary.cs
   select(PolyID, target_id, fun_group, mean_cover_5YBT)
 soil <- read.csv('../RestoreDART_DATA/MIXED_MODELS/xx_soil_df.csv') |>
   distinct()
+coords <- read.csv("../RestoreDART_DATA/MIXED_MODELS/xx_coord_df.csv") |>
+  rename('PolyID' = polygon, 'target_id' = SOLIS_pixel) |>
+  select(-ID, -RAP_pixel) |>
+  group_by(PolyID, target_id) |>
+  distinct() |>
+  summarise(X = round(mean(X)), Y = round(mean(Y)), .groups = 'drop')
 
 # modify
 climate_long <- left_join(aridity_long, spei_long, by = c('ActnDsc', 'trtYear', 'post_fr', 'PolyID', "dat_src", 'trtID', 'Year')) |>
@@ -82,7 +88,8 @@ dart <- dart |>
   mutate(PolyID = as.integer(PolyID)) |>
   left_join(climate_long, by = c('PolyID', 'year.index')) |>
   mutate(YearSinceTrt = year.index - trtYear) |>
-  left_join(soil, by = c('PolyID', 'target_id'))
+  left_join(soil, by = c('PolyID', 'target_id')) |>
+  left_join(coords, by = c('PolyID', 'target_id'))
 
 # check
 dart |>
@@ -130,8 +137,8 @@ dat <- dart |>
   # assume 'vegetation removal' is the same as 'vegetation removal_manual'
   mutate(tx_comb = gsub('^vegetation removal$', 'vegetation removal_manual', tx_comb)) |>
   mutate(year_diff = year_tx - year_RAP) |>
-  mutate(sig = lower > 0 | upper < 0) |>
-  mutate(subj = paste(polygon, pixel, sep = '_'))
+  mutate(sig = lower > 0 | upper < 0)
+  #mutate(subj = paste(polygon, pixel, sep = '_'))
 
 stopifnot(all(dat$tx_comb %in% tx_key$tx_fine))
 
@@ -152,7 +159,7 @@ round((table(dat$sig) / length(dat$sig)) * 100, 2)
 # re-order columns
 dat <- dat |>
   select(
-    effect, lower, upper, sig, polygon, pixel, subj, fun_group, objective, year_RAP, year_tx, year_diff,
+    effect, lower, upper, sig, polygon, pixel, X, Y, fun_group, objective, year_RAP, year_tx, year_diff,
     aridity, spei, ELEVm, SLOPE, MELTON, soilec, sand, silt, mean_cover_5YBT, 
     tx_fine, tx_coarse, prescribed_burn, seeding, soil_disturbance, vegetation_removal
   )

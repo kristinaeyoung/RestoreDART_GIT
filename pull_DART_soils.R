@@ -9,6 +9,7 @@ dart_rdata_folder     <- "../RestoreDART_DATA/RDATA_ID/"
 dart_save_base_folder <- "../RestoreDART_DATA/RDATA_save/"
 d0_fl <- "../RestoreDART_DATA/MIXED_MODELS/1_combined_filter_input_data.csv"
 out_fl <- "../RestoreDART_DATA/MIXED_MODELS/xx_soil_df.csv"
+coord_fl <- "../RestoreDART_DATA/MIXED_MODELS/xx_coord_df.csv"
 
 d0 <- read.csv(d0_fl)
 
@@ -34,6 +35,7 @@ processed_ids <- unique(as.numeric(gsub(".*ID_(\\d+)_trt_effects\\.csv$", "\\1",
 ids_to_run <- setdiff(unique_ids, processed_ids)
 
 soil_df <- data.frame()
+coord_df <- data.frame()
 
 #n_check <- 138
 # run 3/27/26 for 950 polygons, 1014247 rows (PolyID x target_id)
@@ -68,7 +70,8 @@ for (i in seq_along(ids_to_run)) {
   # check d0$PolyID against polyID and d0$target_id against i0$ID
   # skip if previously checked to speed up
   #if (i < n_check) {
-  if (TRUE) {
+  if (FALSE) {
+    # this works with the previous version of 1_combined_filter_input_data.csv, but not with updated version
     di <- d0 |>
       filter(PolyID == polyID) |>
       select(response, fun_group, target_id, year.index) |>
@@ -127,6 +130,7 @@ for (i in seq_along(ids_to_run)) {
     
   }
   
+  # pull the soil data
   idf <- i0 |>
     as.data.frame() |>
     mutate(PolyID = rep(polyID, nrow(i0))) |>
@@ -135,7 +139,12 @@ for (i in seq_along(ids_to_run)) {
     relocate(target_id) |>
     relocate(PolyID)
   
-  # pull the soil data
+  # pull the coordinate data
+  cdf <- i0 |>
+    subset(select = c(ID, RAP_pixel, SOLIS_pixel))
+  cdf_c <- sf::st_coordinates(cdf)
+  cdf <- cbind(data.frame(polygon = rep(polyID, nrow(cdf))), sf::st_drop_geometry(cdf), cdf_c)
+  # CRS: "+proj=aea +lat_0=23 +lon_0=-96 +lat_1=29.5 +lat_2=45.5 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs"
   
   # collate the soil data
   if (i == 1) {
@@ -143,9 +152,19 @@ for (i in seq_along(ids_to_run)) {
   } else {
     soil_df <- rbind(soil_df, idf)
   }
+  
+  # collate the coordinate data
+  if (i == 1) {
+    coord_df <- cdf
+  } else {
+    coord_df <- rbind(coord_df, cdf)
+  }
 
 }
 
 if (!file.exists(out_fl)) {
   write.csv(soil_df, out_fl, row.names = F)
+}
+if (!file.exists(coord_fl)) {
+  write.csv(coord_df, coord_fl, row.names = F)
 }

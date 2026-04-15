@@ -12,17 +12,19 @@ set.seed(1)
 in_fl <- '../RestoreDART_DATA/MIXED_MODELS/1_combined_filter_input_data_14042026.csv'
 brms_mod_dir <- '../RestoreDART_DATA/MIXED_MODELS/brms_models'
 
-dat <- read.csv(in_fl)
+#dat <- read.csv(in_fl)
+# dat_PFG <- dat |>
+#   filter(fun_group == 'AFG') |>
+#   filter(grepl('increase_PFG', objective)) |>
+#   filter(sig == TRUE) |>
+#   select(-sig) |>
+#   filter(year_diff >= 0) |>
+#   filter(effect > 0) |>
+#   # only two samples of prescribed burn;seeding;soil disturbance
+#   filter_out(tx_coarse == 'prescribed burn;seeding;soil disturbance')
+# write.csv(dat_PFG, '../RestoreDART_DATA/MIXED_MODELS/brms_models/PFG_test_data.csv')
 
-dat_PFG <- dat |>
-  filter(fun_group == 'AFG') |>
-  filter(grepl('increase_PFG', objective)) |>
-  filter(sig == TRUE) |>
-  select(-sig) |>
-  filter(year_diff >= 0) |>
-  filter(effect > 0) |>
-  # only two samples of prescribed burn;seeding;soil disturbance
-  filter_out(tx_coarse == 'prescribed burn;seeding;soil disturbance')
+dat_PFG <- read.csv('../RestoreDART_DATA/MIXED_MODELS/brms_models/PFG_test_data.csv')
 
 # model notes:
 # sig TRUE and effect > 0 works well with a lognormal family
@@ -33,21 +35,22 @@ dat_PFG <- dat |>
 # effect ~ (1 | tx_coarse/year_diff) doesnt make sense with time as an unordered effect
 f_1 <- brmsformula(effect ~ (1 + year_diff | tx_coarse), family = lognormal())
 
-fit_1 <- brms::brm(formula = f_1, data = dat_PFG, chains = 4, iter = 5000, warmup  = 2000, cores = 4)
+fit_1 <- brms::brm(formula = f_1, data = dat_PFG, chains = 4, iter = 5000, warmup  = 2000, cores = 4,
+                   control = list(adapt_delta = 0.99))
 summary(fit_1)
 pp_check(fit_1, ndraws = 100) 
 pairs(fit_1)
 ranef(fit_1)
 
 # moran's
-res <- residuals(fit, method = "posterior_predict")[, "Estimate"]
-Create spatial weights: listw <- nb2listw(neighbors, style = "W")
-Run test: spdep::moran.test(res, listw).
+#res <- residuals(fit, method = "posterior_predict")[, "Estimate"]
+#Create spatial weights: listw <- nb2listw(neighbors, style = "W")
+#Run test: spdep::moran.test(res, listw).
 
 
-fit_2 <- brms::brm(
-  formula = f_2, data = dat_PFG, chains = 4, iter = 3000, warmup  = 1000, cores = 4
-)
+# fit_2 <- brms::brm(
+#   formula = f_2, data = dat_PFG, chains = 4, iter = 3000, warmup  = 1000, cores = 4
+# )
 #fit_3 <- brms::brm(
 #  formula = f_3, data = dat_PFG, chains = 4, iter = 3000, warmup  = 1000, cores = 4
 #)
@@ -56,19 +59,19 @@ fit_2 <- brms::brm(
 #)
 
 save(fit_1, file = file.path(brms_mod_dir, 'fit_1_PFG.RData'))
-save(fit_2, file = file.path(brms_mod_dir, 'fit_2_PFG.RData'))
+# save(fit_2, file = file.path(brms_mod_dir, 'fit_2_PFG.RData'))
 #save(fit_3, file = file.path(brms_mod_dir, 'fit_3_PFG.RData'))
 #save(fit_4, file = file.path(brms_mod_dir, 'fit_4_PFG.RData'))
 
 # claude generated template below
 summary(fit_1)
-print(prior_summary(fit_1))
+# print(prior_summary(fit_1))
 
 #bayesplot::mcmc_trace(fit_1)
 #bayesplot::mcmc_rhat(rhat(fit_1))
 #bayesplot::mcmc_neff(neff_ratio(fit_1))
 
-pp_check(fit_1, ndraws = 100)
+# pp_check(fit_1, ndraws = 100)
 #pp_check(fit_2, ndraws = 100)
 #pp_check(fit_3, ndraws = 100)
 #pp_check(fit_4, ndraws = 100)

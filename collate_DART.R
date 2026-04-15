@@ -31,6 +31,8 @@ for (i in seq_along(d_fls)) {
     out_df <- rbind(out_df, idf)
   }
   
+  #break
+  
 }
 
 write.csv(out_df, out_fl, row.names = F)
