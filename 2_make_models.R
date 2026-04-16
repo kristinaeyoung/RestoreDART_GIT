@@ -23,6 +23,11 @@ dat_PFG <- dat |>
   filter(effect > 0) |>
   # only two samples of prescribed burn;seeding;soil disturbance
   filter_out(tx_coarse == 'prescribed burn;seeding;soil disturbance')
+eco_low <- table(dat_PFG$us_l4code)
+eco_low <- eco_low[which(eco_low > 30)]
+dat_PFG <- dat_PFG |>
+  filter(us_l4code %in% names(eco_low))
+
 write.csv(dat_PFG, '../RestoreDART_DATA/MIXED_MODELS/brms_models/PFG_test_data.csv')
 
 #dat_PFG <- read.csv('../RestoreDART_DATA/MIXED_MODELS/brms_models/PFG_test_data.csv')
@@ -34,10 +39,11 @@ write.csv(dat_PFG, '../RestoreDART_DATA/MIXED_MODELS/brms_models/PFG_test_data.c
 # (1 | polygon/year_diff) is better, 171 divergent, pairs not terrible. but, polygon taking information away from tx?
 # effect ~ (1 | tx_coarse) fits well, does not account for time
 # effect ~ (1 | tx_coarse/year_diff) doesnt make sense with time as an unordered effect
-f_1 <- brmsformula(effect ~ (1 + year_diff | tx_coarse), family = lognormal())
+# effect ~ (1 + year_diff | tx_coarse) works sensibly, but still some spatial residual issues
+f_1 <- brmsformula(effect ~ (1 + year_diff | tx_coarse) + (1 | us_l4code), family = lognormal())
 #load(file.path(brms_mod_dir, 'fit_1_PFG.RData'))
 fit_1 <- brms::brm(formula = f_1, data = dat_PFG, chains = 4, iter = 5000, warmup  = 2000, cores = 4,
-                  control = list(adapt_delta = 0.99))
+                  control = list(adapt_delta = 0.99, max_treedepth = 11))
 summary(fit_1)
 pp_check(fit_1, ndraws = 100) 
 pairs(fit_1)
@@ -46,17 +52,25 @@ ranef(fit_1)
 # moran's
 c_1 <- as.matrix(dat_PFG[, c('X', 'Y')])
 # fuzz the points by +/- 15 m to make sure they aren't identical
-c_1[, 1] <- c_1[, 1] + sample(seq(-15, 15), nrow(c_1), replace = T)
-c_1[, 2] <- c_1[, 2] + sample(seq(-15, 15), nrow(c_1), replace = T)
-# one point that is still identical
+c_1[, 1] <- c_1[, 1] + sample(seq(-10, 10), nrow(c_1), replace = T)
+c_1[, 2] <- c_1[, 2] + sample(seq(-10, 10), nrow(c_1), replace = T)
 c_1[, 1] <- c_1[, 1] + sample(seq(-1, 1), nrow(c_1), replace = T)
 c_1[, 2] <- c_1[, 2] + sample(seq(-1, 1), nrow(c_1), replace = T)
-knn_1 <- knearneigh(c_1, k = 100)
+table(table(paste0(c_1[, 1], c_1[, 2])))
+crs0 <- sf::st_crs("+proj=aea +lat_0=23 +lon_0=-96 +lat_1=29.5 +lat_2=45.5 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs")
+c_sf <- sf::st_as_sf(as.data.frame(c_1), coords = c('X', 'Y'), crs = crs0)
+knn_1 <- knearneigh(c_sf, use_kd_tree = T)
 knn_1 <- knn2nb(knn_1)
-res_1 <- residuals(fit_1, method = "posterior_predict")[, "Estimate"]
+#res_1 <- residuals(fit_1, method = "posterior_predict")[, "Estimate"]
 listw_1 <- nb2listw(knn_1, style = "W")
 moran.test(res_1, listw_1)
-# spatial structure very significant
+# spatial structure very significant...
+
+dat_PFG$effect_log <- log(dat_PFG$effect)
+f_2 <- brmsformula(effect_log ~ (1 + year_diff | tx_coarse) + (1 | us_l4code) + sar(M = w0, type = 'error'), family = gaussian())
+#load(file.path(brms_mod_dir, 'fit_1_PFG.RData'))
+fit_2 <- brms::brm(formula = f_2, data = dat_PFG, chains = 4, iter = 5000, warmup  = 2000, cores = 4,
+                   control = list(adapt_delta = 0.99, max_treedepth = 11), data2 = list(w0 = listw_1))
 
 # fit_2 <- brms::brm(
 #   formula = f_2, data = dat_PFG, chains = 4, iter = 3000, warmup  = 1000, cores = 4
