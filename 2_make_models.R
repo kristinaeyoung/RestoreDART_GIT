@@ -27,10 +27,9 @@ eco_low <- table(dat_PFG$us_l4code)
 eco_low <- eco_low[which(eco_low > 30)]
 dat_PFG <- dat_PFG |>
   filter(us_l4code %in% names(eco_low))
-
 write.csv(dat_PFG, '../RestoreDART_DATA/MIXED_MODELS/brms_models/PFG_test_data.csv')
 
-#dat_PFG <- read.csv('../RestoreDART_DATA/MIXED_MODELS/brms_models/PFG_test_data.csv')
+dat_PFG <- read.csv('../RestoreDART_DATA/MIXED_MODELS/brms_models/PFG_test_data.csv')
 
 # model notes:
 # sig TRUE and effect > 0 works well with a lognormal family
@@ -41,9 +40,9 @@ write.csv(dat_PFG, '../RestoreDART_DATA/MIXED_MODELS/brms_models/PFG_test_data.c
 # effect ~ (1 | tx_coarse/year_diff) doesnt make sense with time as an unordered effect
 # effect ~ (1 + year_diff | tx_coarse) works sensibly, but still some spatial residual issues
 f_1 <- brmsformula(effect ~ (1 + year_diff | tx_coarse) + (1 | us_l4code), family = lognormal())
-#load(file.path(brms_mod_dir, 'fit_1_PFG.RData'))
-fit_1 <- brms::brm(formula = f_1, data = dat_PFG, chains = 4, iter = 5000, warmup  = 2000, cores = 4,
-                  control = list(adapt_delta = 0.99, max_treedepth = 11))
+load(file.path(brms_mod_dir, 'fit_1_PFG.RData'))
+# fit_1 <- brms::brm(formula = f_1, data = dat_PFG, chains = 4, iter = 5000, warmup  = 2000, cores = 4,
+#                   control = list(adapt_delta = 0.99, max_treedepth = 11))
 summary(fit_1)
 pp_check(fit_1, ndraws = 100) 
 pairs(fit_1)
@@ -61,7 +60,7 @@ crs0 <- sf::st_crs("+proj=aea +lat_0=23 +lon_0=-96 +lat_1=29.5 +lat_2=45.5 +x_0=
 c_sf <- sf::st_as_sf(as.data.frame(c_1), coords = c('X', 'Y'), crs = crs0)
 knn_1 <- knearneigh(c_sf, use_kd_tree = T)
 knn_1 <- knn2nb(knn_1)
-#res_1 <- residuals(fit_1, method = "posterior_predict")[, "Estimate"]
+res_1 <- residuals(fit_1, method = "posterior_predict")[, "Estimate"]
 listw_1 <- nb2listw(knn_1, style = "W")
 moran.test(res_1, listw_1)
 # spatial structure very significant...
@@ -82,8 +81,8 @@ fit_2 <- brms::brm(formula = f_2, data = dat_PFG, chains = 4, iter = 5000, warmu
 #  formula = f_4, data = dat_PFG, chains = 4, iter = 3000, warmup  = 1000, cores = 4
 #)
 
-save(fit_1, file = file.path(brms_mod_dir, 'fit_1_PFG.RData'))
-# save(fit_2, file = file.path(brms_mod_dir, 'fit_2_PFG.RData'))
+#save(fit_1, file = file.path(brms_mod_dir, 'fit_1_PFG.RData'))
+save(fit_2, file = file.path(brms_mod_dir, 'fit_2_PFG.RData'))
 #save(fit_3, file = file.path(brms_mod_dir, 'fit_3_PFG.RData'))
 #save(fit_4, file = file.path(brms_mod_dir, 'fit_4_PFG.RData'))
 
