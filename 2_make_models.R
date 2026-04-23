@@ -1,19 +1,4 @@
-# BEM March 2026
-
-library(dplyr)
-library(brms)
-library(spdep)
-
-set.seed(1)
-
-# TODO:
-#    * write/develop methods for modelling the data structure
-#    * currently, 1 model = 1 objective, and only "significant' pixels are used
-
-in_fl <- '../RestoreDART_DATA/MIXED_MODELS/1_combined_filter_input_data_14042026.csv'
-brms_mod_dir <- '../RestoreDART_DATA/MIXED_MODELS/brms_models'
-
-dat <- read.csv(in_fl)
+                                                                                                                                                                                                        
 dat_PFG <- dat |>
   filter(fun_group == 'PFG') |>
   filter(grepl('increase_PFG', objective)) |>

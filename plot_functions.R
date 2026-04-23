@@ -171,3 +171,28 @@ fig_2 <- function(input_df) {
   
   return(fig_2)
 }
+plot_effects <- function(data, y_var = "effect") {
+  
+  ggplot(data,
+         aes(x = year_RAP,
+             y = .data[[y_var]],
+             color = tx_coarse,
+             fill = tx_coarse)) +
+    geom_ribbon(aes(ymin = lower,
+                    ymax = upper),
+                alpha = 0.2,
+                color = NA) +
+    geom_line(linewidth = 0.8) +
+    facet_wrap(~ us_l4code) +
+    labs(x = "Year (RAP)",
+         y = y_var,
+         color = "Treatment",
+         fill = "Treatment") +
+    theme_bw() +
+    theme(
+      axis.text.x = element_text(color = "black"),
+      axis.text.y = element_text(color = "black"),
+      axis.title.x = element_text(color = "black"),
+      axis.title.y = element_text(color = "black")
+    )
+}
