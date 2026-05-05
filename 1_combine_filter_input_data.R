@@ -30,7 +30,7 @@ new_ai <- read.csv('../RestoreDART_DATA/CLIMATE_DATA/AI_21_24.csv') |>
   select(-ActnDsc, -trtYear, -post_fr, -dat_src, -trtID)
 new_spei <- read.csv('../RestoreDART_DATA/CLIMATE_DATA/SPEI_21_24.csv') |>
   select(-ActnDsc, -trtYear, -post_fr, -dat_src, -trtID)
-objectives <- readxl::read_excel("../RestoreDART_DATA/objectives/MARCH2025_OBJECTIVES_27032026.xlsx")
+objectives <- readxl::read_excel("../RestoreDART_DATA/objectives/MARCH2025_OBJECTIVES_30042026.xlsx")
 aridity_long <- read.csv('../RestoreDART_DATA/CLIMATE_DATA/Annual_Mean_AI_For_DART_1km.csv', header = T) |>
   left_join(new_ai) |>
   tidyr::pivot_longer(

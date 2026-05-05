@@ -79,28 +79,28 @@ fig_1 <- function(input_df) {
   
   d1_f1 <- dplyr::group_by(
     input_df,
-    years_since_treatment,
-    eco,
+    year_diff,
+    us_l4name,
     tx_coarse
   )
   
   d1_f1 <- dplyr::summarise(
     d1_f1,
-    prop_sig = mean(sig_effect, na.rm = TRUE),
+    prop_sig = mean(sig, na.rm = TRUE),
     .groups = "drop"
   )
   
   fig_1 <- ggplot2::ggplot(
     d1_f1,
     ggplot2::aes(
-      x = years_since_treatment,
+      x = year_diff,
       y = tx_coarse,
       fill = prop_sig
     )
   ) +
     ggplot2::geom_tile() +
     # ggplot2::geom_text(aes(label = signif(prop_sig, 2)), size = 3) +
-    ggplot2::facet_wrap(~ eco, scales = 'free_y') +
+    ggplot2::facet_wrap(~ us_l4name, scales = 'free_y') +
     #ggplot2::coord_fixed() +
     ggplot2::scale_fill_viridis_c(
       option = "magma",
@@ -126,20 +126,20 @@ fig_2 <- function(input_df) {
   
   d1_f2 <- dplyr::group_by(
     input_df,
-    years_since_treatment,
+    year_diff,
     tx_coarse
   )
   
   d1_f2 <- dplyr::summarise(
     d1_f2,
-    prop_sig = mean(sig_effect, na.rm = TRUE),
+    prop_sig = mean(sig, na.rm = TRUE),
     .groups = "drop"
   )
   
   fig_2 <- ggplot2::ggplot(
     d1_f2,
     ggplot2::aes(
-      x = years_since_treatment,
+      x = year_diff,
       y = tx_coarse,
       fill = prop_sig
     )
@@ -149,7 +149,6 @@ fig_2 <- function(input_df) {
       ggplot2::aes(label = signif(prop_sig, 2)),
       size = 2
     ) +
-    # ggplot2::facet_wrap(~ eco) +
     ggplot2::coord_fixed() +
     ggplot2::scale_fill_viridis_c(
       option = "magma",
