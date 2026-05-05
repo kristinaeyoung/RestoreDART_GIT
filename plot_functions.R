@@ -77,27 +77,16 @@ Multiplot <- function(..., plotlist = NULL, file, cols = 1, layout = NULL) {
 }
 fig_1 <- function(input_df) {
   
-  d1_f1 <- dplyr::group_by(
-    input_df,
-    year_diff,
-    us_l4name,
-    tx_coarse
-  )
-  
-  d1_f1 <- dplyr::summarise(
-    d1_f1,
-    prop_sig = mean(sig, na.rm = TRUE),
-    .groups = "drop"
-  )
-  
-  fig_1 <- ggplot2::ggplot(
-    d1_f1,
-    ggplot2::aes(
-      x = year_diff,
-      y = tx_coarse,
-      fill = prop_sig
-    )
-  ) +
+  f0 <- input_df |>
+    dplyr::group_by(year_diff, us_l4name, tx_coarse) |>
+    dplyr::summarise(prop_sig = mean(sig, na.rm = T), .groups = "drop") |>
+    ggplot2::ggplot(
+      ggplot2::aes(
+        x = year_diff,
+        y = tx_coarse,
+        fill = prop_sig
+      )
+    ) +
     ggplot2::geom_tile() +
     # ggplot2::geom_text(aes(label = signif(prop_sig, 2)), size = 3) +
     ggplot2::facet_wrap(~ us_l4name, scales = 'free_y') +
@@ -120,7 +109,8 @@ fig_1 <- function(input_df) {
       strip.text = ggplot2::element_text(color = "black")
     )
   
-  return(fig_1)
+  return(f0)
+  
 }
 fig_2 <- function(input_df) {
   

@@ -137,7 +137,8 @@ dat <- dart |>
   mutate(tx_comb = gsub('^greenstrip$', 'greenstrip_ground seeding', tx_comb)) |>
   # assume 'vegetation removal' is the same as 'vegetation removal_manual'
   mutate(tx_comb = gsub('^vegetation removal$', 'vegetation removal_manual', tx_comb)) |>
-  mutate(year_diff = year_tx - year_RAP) |>
+  # year_diff should be positive when RAP measurement is post-treatment
+  mutate(year_diff = year_RAP - year_tx) |>
   mutate(sig = lower > 0 | upper < 0)
   #mutate(subj = paste(polygon, pixel, sep = '_'))
 
