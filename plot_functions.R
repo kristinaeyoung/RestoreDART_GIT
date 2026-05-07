@@ -76,89 +76,68 @@ Multiplot <- function(..., plotlist = NULL, file, cols = 1, layout = NULL) {
   }
 }
 fig_1 <- function(input_df) {
+  require(dplyr)
+  require(ggplot2)
   
   f0 <- input_df |>
-    dplyr::group_by(year_diff, us_l4name, tx_coarse) |>
-    dplyr::summarise(prop_sig = mean(sig, na.rm = T), .groups = "drop") |>
-    ggplot2::ggplot(
-      ggplot2::aes(
-        x = year_diff,
-        y = tx_coarse,
-        fill = prop_sig
-      )
-    ) +
-    ggplot2::geom_tile() +
+    group_by(year_diff, us_l4name, tx_coarse) |>
+    summarise(prop_sig = mean(sig, na.rm = T), .groups = "drop") |>
+    ggplot(aes(x = year_diff, y = tx_coarse, fill = prop_sig)) +
+    geom_tile() +
     # ggplot2::geom_text(aes(label = signif(prop_sig, 2)), size = 3) +
-    ggplot2::facet_wrap(~ us_l4name, scales = 'free_y') +
+    facet_wrap(~ us_l4name, scales = 'free_y') +
     #ggplot2::coord_fixed() +
-    ggplot2::scale_fill_viridis_c(
+    scale_fill_viridis_c(
       option = "magma",
       limits = c(0, 1),
       name = "Proportion\nSignificant\nDART Pixels"
     ) +
-    ggplot2::labs(
+    labs(
       x = "Years Since Treatment",
       y = "Treatment (Coarse)",
       title = "What proportion of treated areas significantly increased PFG?",
       subtitle = "(when objective was increase_PFG)"
     ) +
-    ggplot2::theme_bw() +
-    ggplot2::theme(
-      axis.text.x = ggplot2::element_text(color = "black"),
-      axis.text.y = ggplot2::element_text(color = "black"),
-      strip.text = ggplot2::element_text(color = "black")
+    theme_bw() +
+    theme(
+      axis.text.x = element_text(color = "black"),
+      axis.text.y = element_text(color = "black"),
+      strip.text = element_text(color = "black")
     )
   
   return(f0)
   
 }
 fig_2 <- function(input_df) {
+  require(dplyr)
+  require(ggplot2)
   
-  d1_f2 <- dplyr::group_by(
-    input_df,
-    year_diff,
-    tx_coarse
-  )
-  
-  d1_f2 <- dplyr::summarise(
-    d1_f2,
-    prop_sig = mean(sig, na.rm = TRUE),
-    .groups = "drop"
-  )
-  
-  fig_2 <- ggplot2::ggplot(
-    d1_f2,
-    ggplot2::aes(
-      x = year_diff,
-      y = tx_coarse,
-      fill = prop_sig
-    )
-  ) +
-    ggplot2::geom_tile() +
-    ggplot2::geom_text(
-      ggplot2::aes(label = signif(prop_sig, 2)),
-      size = 2
-    ) +
-    ggplot2::coord_fixed() +
-    ggplot2::scale_fill_viridis_c(
+  f0 <- input_df |>
+    group_by(year_diff, tx_coarse) |>
+    summarise(prop_sig = mean(sig, na.rm = T), .groups = "drop") |>
+    ggplot(aes(x = year_diff, y = tx_coarse, fill = prop_sig)) +
+    geom_tile() +
+    geom_text(aes(label = signif(prop_sig, 2)), size = 2) +
+    coord_fixed() +
+    scale_fill_viridis_c(
       option = "magma",
       limits = c(0, 1),
       name = "Proportion\nSignificant\nDART Pixels"
     ) +
-    ggplot2::labs(
+    labs(
       x = "Years Since Treatment",
       y = "Treatment (Coarse)",
       title = "What proportion of treated areas significantly increased PFG?",
       subtitle = "(when objective was increase_PFG)"
     ) +
-    ggplot2::theme_bw() +
-    ggplot2::theme(
-      axis.text.x = ggplot2::element_text(color = "black"),
-      axis.text.y = ggplot2::element_text(color = "black"),
-      strip.text = ggplot2::element_text(color = "black")
+    theme_bw() +
+    theme(
+      axis.text.x = element_text(color = "black"),
+      axis.text.y = element_text(color = "black"),
+      strip.text = element_text(color = "black")
     )
   
-  return(fig_2)
+  return(f0)
 }
 plot_effects <- function(data, y_var = "effect") {
   

@@ -12,10 +12,8 @@ source('plot_functions.R')
 # File Names/directories
 fig_dir <- '../results/figures'
 in_file <- '../RestoreDART_DATA/MIXED_MODELS/1_combined_filter_input_data_04052026.csv'
-tx_key_fl <- '../results/tx_key_BEM.csv'
 
 d0 <- read.csv(in_file)
-#d0_test <- read.csv('../RestoreDART_DATA/MIXED_MODELS/1_combined_filter_input_data_GH.csv')
 
 # how many unique methods?
 v1 <- unique(d0$tx_coarse) |>
@@ -28,10 +26,22 @@ d_PFG <- d0 |>
   filter(objective == 'increase_PFG') |>
   filter(grepl('PFG', fun_group)) |>
   filter(year_diff > 0)
+
+# test figures
+fig1 <- fig_1(d_PFG)
+fig2 <- fig_2(d_PFG)
+
+png(file.path(fig_dir, 'fig_1.png'), 25, 9, 'in', res = 150)
+fig1
+dev.off()
+
+png(file.path(fig_dir, 'fig_2.png'), 25, 9, 'in', res = 150)
+fig2
+dev.off()
+
   
 # also decrease_AFG, increase_SHR, decrease_SHR, decrease_TRE
 # for combination objectives, how do we decide which go into their own groups?
-
 # each df has a landscape response to restoration for a set of pixels and years within polygons
 
 # question 1: was there a significant treatment effect?
