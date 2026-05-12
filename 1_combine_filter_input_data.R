@@ -113,7 +113,7 @@ dart <- dart |>
   tidyr::drop_na()
 # 15,216,023, 2.9% reduction in total data, but lots missing from 2021-2024
 
-# rename columns
+# rename columns and modify
 dat <- dart |>
   select(-response, -point.pred, -point.pred.lower, -point.pred.upper, -YearSinceTrt, -r) |>
   select(-PLANC, -PROFC, -SWI, -RELELEV02, -RELELEV16, -RELELEV32, -MODGMRPH, 
@@ -139,8 +139,11 @@ dat <- dart |>
   mutate(tx_comb = gsub('^vegetation removal$', 'vegetation removal_manual', tx_comb)) |>
   # year_diff should be positive when RAP measurement is post-treatment
   mutate(year_diff = year_RAP - year_tx) |>
-  mutate(sig = lower > 0 | upper < 0)
-  #mutate(subj = paste(polygon, pixel, sep = '_'))
+  mutate(sig = lower > 0 | upper < 0) |>
+  #mutate(subj = paste(polygon, pixel, sep = '_')) |>
+  mutate(objective = tolower(objective)) |>
+  filter_out(objective %in% c(NA, 'multi_directional')) |>
+  filter_out(grepl('decrease_pfg', objective)) # only 63 (==)/ 423 (grep) rows for this objective, 0/40 significant
 
 stopifnot(all(dat$tx_comb %in% tx_key$tx_fine))
 

@@ -75,6 +75,43 @@ Multiplot <- function(..., plotlist = NULL, file, cols = 1, layout = NULL) {
     }
   }
 }
+plot_sig_dart_pix <- function(input_df, ptype = 1, ftype, obj) {
+  require(dplyr)
+  require(ggplot2)
+  
+  fdf <- input_df |>
+    group_by(year_diff, us_l4name, tx_coarse) |>
+    summarise(prop_sig = mean(sig, na.rm = T), .groups = "drop") |>
+    mutate(prop_sig = ifelse(prop_sig == 0, 0.001, prop_sig)) |>
+    mutate(prop_sig = ifelse(prop_sig == 1, 0.999, prop_sig)) |>
+    mutate(prop_sig_char = format(round(prop_sig, 2), nsmall = 2))
+  
+  p0 <- fdf |>
+    ggplot(aes(x = year_diff, y = tx_coarse, fill = prop_sig)) +
+    geom_tile() +
+    scale_fill_viridis_c(option = "magma", limits = c(0, 1),name = "Proportion\nSignificant\nDART Pixels") +
+    labs(
+      x = "Years Since Treatment", y = "Treatment (Coarse)",
+      title = paste0("What proportion of treated areas significantly increased ", ftype, "?"),
+      subtitle = paste0("(when objective was ", obj, ")")
+    ) +
+    theme_bw() +
+    theme(axis.text = element_text(color = 'black'), strip.text = element_text(color = 'black'))
+    
+  if (ptype == 1) {
+    p0 <- p0 +
+      facet_wrap(~ us_l4name, scales = 'free_y')
+  } else if (ptype == 2) {
+    p0 <- p0 +
+      geom_text(aes(label = prop_sig_char), size = 2, check_overlap = T) +
+      coord_fixed()
+  } else {
+    stop('bad ptype')
+  }
+  
+  return(p0)
+  
+}
 fig_1 <- function(input_df) {
   require(dplyr)
   require(ggplot2)

@@ -15,21 +15,40 @@ in_file <- '../RestoreDART_DATA/MIXED_MODELS/1_combined_filter_input_data_040520
 
 d0 <- read.csv(in_file)
 
+# fixes
+d0 <- d0 |>
+  filter_out(grepl('null_afg', objective)) # what is null_afg anyway? 
+  
 # how many unique methods?
-v1 <- unique(d0$tx_coarse) |>
+unique(d0$tx_coarse) |>
   strsplit(';') |>
   unlist() |>
-  unique()
+  unique() |>
+  print()
+
+# how many unique objectives?
+unique(d0$objective) |>
+  strsplit(', ') |>
+  unlist() |>
+  unique() |>
+  print()
 
 # condense objectives into 5 separate models
-d_PFG <- d0 |>
-  filter(objective == 'increase_PFG') |>
+d_i_PFG <- d0 |>
+  filter(grepl('increase_pfg', objective)) |>
+  filter(grepl('PFG', fun_group)) |>
+  filter(year_diff > 0)
+d_d_shr <- d0 |>
+  filter(grepl('decrease_shr', objective)) |>
   filter(grepl('PFG', fun_group)) |>
   filter(year_diff > 0)
 
 # test figures
-fig1 <- fig_1(d_PFG)
-fig2 <- fig_2(d_PFG)
+fig1 <- plot_sig_dart_pix(d_i_PFG, 1, 'PFG', 'increase_pfg')
+fig2 <- plot_sig_dart_pix(d_i_PFG, 2, 'PFG', 'increase_pfg')
+
+fig3 <- fig_1(d_PFG)
+fig4 <- fig_2(d_PFG)
 
 png(file.path(fig_dir, 'fig_1.png'), 25, 9, 'in', res = 150)
 fig1
@@ -37,6 +56,24 @@ dev.off()
 
 png(file.path(fig_dir, 'fig_2.png'), 25, 9, 'in', res = 150)
 fig2
+dev.off()
+
+# check year 15/16/17 and prescribed burn;seeding;soil disturbance
+test0 <- d_i_PFG |>
+  filter(tx_coarse == 'prescribed burn;seeding;soil disturbance') |>
+  filter(year_diff %in% c(15, 16, 17)) |>
+  group_by(year_diff, us_l4name, tx_coarse) |>
+  summarise(prop_sig = mean(sig, na.rm = T), .groups = "drop") |>
+  mutate(prop_sig = ifelse(prop_sig == 0, 0.001, prop_sig)) |>
+  mutate(prop_sig = ifelse(prop_sig == 1, 0.999, prop_sig)) |>
+  mutate(prop_sig_char = format(round(prop_sig, 2), nsmall = 2))
+
+png(file.path(fig_dir, 'fig_3.png'), 25, 9, 'in', res = 150)
+fig3
+dev.off()
+
+png(file.path(fig_dir, 'fig_4.png'), 25, 9, 'in', res = 150)
+fig4
 dev.off()
 
   
