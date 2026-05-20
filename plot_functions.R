@@ -103,7 +103,7 @@ plot_sig_dart_pix <- function(input_df, ptype = 1, ftype, obj) {
       facet_wrap(~ us_l4name, scales = 'free_y')
   } else if (ptype == 2) {
     p0 <- p0 +
-      geom_text(aes(label = prop_sig_char), size = 2, check_overlap = T) +
+      #geom_text(aes(label = prop_sig_char), size = 2, check_overlap = T) +
       coord_fixed()
   } else {
     stop('bad ptype')
