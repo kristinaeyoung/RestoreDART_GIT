@@ -43,6 +43,7 @@ d_d_shr <- d0 |>
   filter(grepl('PFG', fun_group)) |>
   filter(year_diff > 0)
 
+
 # test figures
 fig1 <- plot_sig_dart_pix(d_i_PFG, 1, 'PFG', 'increase_pfg')
 fig2 <- plot_sig_dart_pix(d_i_PFG, 2, 'PFG', 'increase_pfg')

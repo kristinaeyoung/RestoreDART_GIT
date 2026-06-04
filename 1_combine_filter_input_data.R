@@ -14,6 +14,7 @@
 #     * 'unknown' treatment dropped, removed 9 polygons and 140 pixels
 #     * filtered by r > 0.5, removed 1% of total observations
 #     * filtered by missing soil/climate, removed 2.9% of total data
+#     * only 63 (==)/ 423 (grep) rows for decrease_pfg objective, 0/40 significant
 
 # TODO:
 #     * update version information on R, dplyr, tidyr
@@ -21,7 +22,7 @@
 # R version 
 library(dplyr)
 
-out_file <- '../RestoreDART_DATA/MIXED_MODELS/1_combined_filter_input_data_04052026.csv'
+out_file <- '../RestoreDART_DATA/MIXED_MODELS/1_combined_filter_input_data_03062026.csv'
 tx_key_fl <- '../results/tx_key_BEM.csv'
 
 # import
@@ -142,9 +143,13 @@ dat <- dart |>
   mutate(sig = lower > 0 | upper < 0) |>
   #mutate(subj = paste(polygon, pixel, sep = '_')) |>
   mutate(objective = tolower(objective)) |>
-  filter_out(objective %in% c(NA, 'multi_directional')) |>
-  filter_out(grepl('decrease_pfg', objective)) # only 63 (==)/ 423 (grep) rows for this objective, 0/40 significant
-
+  filter_out(objective %in% c(NA, 'na', 'multi_directional')) |>
+  filter_out(grepl('decrease_pfg', objective)) |> # only 63 (==)/ 423 (grep) rows for this objective, 0/40 significant
+  mutate(fun_group = ifelse(fun_group == 'bare', 'bar', fun_group)) |>
+  mutate(fun_group = ifelse(fun_group == 'shrub', 'shr', fun_group)) |>
+  mutate(fun_group = ifelse(fun_group == 'tree', 'tre', fun_group)) |>
+  mutate(fun_group = toupper(fun_group))
+  
 stopifnot(all(dat$tx_comb %in% tx_key$tx_fine))
 
 dat <- dat |>
