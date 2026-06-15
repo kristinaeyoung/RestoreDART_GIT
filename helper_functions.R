@@ -50,6 +50,8 @@ get_summary_DART_results <- function(
     bins         = 60
 ) {
   
+  require(dplyr)
+  
   # treatment
   tbl_tx <- table(df_in[[col_tx]])
   # ecoregion
@@ -90,12 +92,24 @@ get_summary_DART_results <- function(
     theme_bw() +
     theme(axis.text = element_text(color = 'black'))
   
-  # percent of significantly different DART pixels:
-  pix_sig     <- round((table(df_in[[col_sig]]) / nrow(df_in)) * 100, 1)[['TRUE']]
-  # percent of significantly different DART pixels that show a positive effect:
-  pix_sig_pos <- round((nrow(df_in[df_in[[col_sig]] == T & df_in[[col_effect]] > 0, ]) / nrow(df_in)) * 100, 1)
-  # percent of significantly different DART pixels that show a negative effect:
-  pix_sig_neg <- round((nrow(df_in[df_in[[col_sig]] == T & df_in[[col_effect]] < 0, ]) / nrow(df_in)) * 100, 1)
+  # overall DART significance
+  pix_sig_TOT <- c(
+    # percent of significantly different DART pixels that show a positive effect:
+    round((table(df_in[[col_sig]]) / nrow(df_in)) * 100, 1)[['TRUE']],
+    pix_sig_pos <- round((nrow(df_in[df_in[[col_sig]] == T & df_in[[col_effect]] > 0, ]) / nrow(df_in)) * 100, 1),
+    # percent of significantly different DART pixels that show a negative effect:
+    pix_sig_neg <- round((nrow(df_in[df_in[[col_sig]] == T & df_in[[col_effect]] < 0, ]) / nrow(df_in)) * 100, 1)
+  )
+  # by-treatment DART significance
+  pix_sig_TX <- df_in |>
+    group_by(.data[[col_tx]]) |>
+    summarise(pix_sig = sum(.data[[col_sig]]), pix_n = n(), .groups = 'drop') |>
+    mutate(pix_sig_perc = round(100 * (pix_sig / pix_n), 2))
+  # by-ecoregion DART significance
+  pix_sig_ECO <- df_in |>
+    group_by(.data[[col_eco]]) |>
+    summarise(pix_sig = sum(.data[[col_sig]]), pix_n = n(), .groups = 'drop') |>
+    mutate(pix_sig_perc = round(100 * (pix_sig / pix_n), 2))
   
   return(list(
     tbl_tx        = tbl_tx,
@@ -105,9 +119,9 @@ get_summary_DART_results <- function(
     pixel_plot_0  = pixel_plot_0,
     pixel_plot_1  = pixel_plot_1,
     poly_plot     = poly_plot,
-    pix_sig       = pix_sig,
-    pix_sig_pos   = pix_sig_pos,
-    pix_sig_neg   = pix_sig_neg
+    pix_sig_TOT   = pix_sig_TOT,
+    pix_sig_TX    = pix_sig_TX,
+    pix_sig_ECO   = pix_sig_ECO
   ))
   
 }
@@ -127,4 +141,27 @@ print_summary_name <- function(xx, ind, type) {
     
   return(zz)
     
+}
+make_excl_table <- function(summary_table, tbl, ...) {
+  
+  tbl <- match.arg(tbl, choices = c('tbl_eco', 'tbl_tx'))
+  tbl_data <- summary_table[[tbl]]
+  
+  excl_ecos <- list(...)
+  
+  excl_cols <- lapply(excl_ecos, paste, collapse = ', ')
+  
+  excl_per <- sapply(seq_along(excl_ecos), function(i) {
+    combined <- unlist(excl_ecos[1:i])
+    round((sum(tbl_data[names(tbl_data) %in% combined]) / sum(tbl_data)) * 100, 2)
+  })
+  
+  excl_lab <- sapply(seq_along(excl_cols), function(i) {
+    paste(unlist(excl_cols[1:i]), collapse = ', ')
+  })
+  
+  return(data.frame(
+    lab = excl_lab,
+    per = paste(excl_per, '%')
+  ))
 }
