@@ -124,7 +124,7 @@ Ecoregions 13i, 14b, 19c  have 81, 65, and 84 pixels respectively, and can be ex
 ```{r results-1_9, echo = F}
 excl_eco <- make_excl_table(s_1, 'tbl_eco', c('13i', '14b', '19c'), c('21c'), c('20a'))
 knitr::kable(excl_eco, col.names = c("Excluded Ecoregions", "Percent Data Lost"))
-    ```
+```
 
 Total 
 
@@ -230,9 +230,9 @@ Response: **`r print_summary_name(summaries, r_ind, 3)`**
 Objective: **`r print_summary_name(summaries, r_ind, 4)`**
 
 ```{r results-2_8, echo = F}
-cat(sprintf("- **%.1f%%** of pixels show a statistically significant DART result.\n", s_2$pix_sig))
-cat(sprintf("- **%.1f%%** of all pixels show a significant *positive* effect.\n", s_2$pix_sig_pos))
-cat(sprintf("- **%.1f%%** of all pixels show a significant *negative* effect.\n", s_2$pix_sig_neg))
+cat(sprintf("- **%.1f%%** of pixels show a statistically significant DART result.\n", s_2$pix_sig_TOT[1]))
+cat(sprintf("- **%.1f%%** of all pixels show a significant *positive* effect.\n", s_2$pix_sig_TOT[2]))
+cat(sprintf("- **%.1f%%** of all pixels show a significant *negative* effect.\n", s_2$pix_sig_TOT[3]))
 ```
 
 *[Human-readable summary of results for `r names(summaries)[2]` goes here.]*
@@ -302,9 +302,9 @@ Response: **`r print_summary_name(summaries, r_ind, 3)`**
 Objective: **`r print_summary_name(summaries, r_ind, 4)`**
 
 ```{r results-3_8, echo = F}
-cat(sprintf("- **%.1f%%** of pixels show a statistically significant DART result.\n", s_3$pix_sig))
-cat(sprintf("- **%.1f%%** of all pixels show a significant *positive* effect.\n", s_3$pix_sig_pos))
-cat(sprintf("- **%.1f%%** of all pixels show a significant *negative* effect.\n", s_3$pix_sig_neg))
+cat(sprintf("- **%.1f%%** of pixels show a statistically significant DART result.\n", s_3$pix_sig_TOT[1]))
+cat(sprintf("- **%.1f%%** of all pixels show a significant *positive* effect.\n", s_3$pix_sig_TOT[2]))
+cat(sprintf("- **%.1f%%** of all pixels show a significant *negative* effect.\n", s_3$pix_sig_TOT[3]))
 ```
 
 *[Human-readable summary of results for `r names(summaries)[3]` goes here.]*
@@ -374,9 +374,9 @@ Response: **`r print_summary_name(summaries, r_ind, 3)`**
 Objective: **`r print_summary_name(summaries, r_ind, 4)`**
 
 ```{r results-4_8, echo = F}
-cat(sprintf("- **%.1f%%** of pixels show a statistically significant DART result.\n", s_4$pix_sig))
-cat(sprintf("- **%.1f%%** of all pixels show a significant *positive* effect.\n", s_4$pix_sig_pos))
-cat(sprintf("- **%.1f%%** of all pixels show a significant *negative* effect.\n", s_4$pix_sig_neg))
+cat(sprintf("- **%.1f%%** of pixels show a statistically significant DART result.\n", s_4$pix_sig_TOT[1]))
+cat(sprintf("- **%.1f%%** of all pixels show a significant *positive* effect.\n", s_4$pix_sig_TOT[2]))
+cat(sprintf("- **%.1f%%** of all pixels show a significant *negative* effect.\n", s_4$pix_sig_TOT[3]))
 ```
 
 *[Human-readable summary of results for `r names(summaries)[4]` goes here.]*
@@ -446,9 +446,9 @@ Response: **`r print_summary_name(summaries, r_ind, 3)`**
 Objective: **`r print_summary_name(summaries, r_ind, 4)`**
 
 ```{r results-5_8, echo = F}
-cat(sprintf("- **%.1f%%** of pixels show a statistically significant DART result.\n", s_5$pix_sig))
-cat(sprintf("- **%.1f%%** of all pixels show a significant *positive* effect.\n", s_5$pix_sig_pos))
-cat(sprintf("- **%.1f%%** of all pixels show a significant *negative* effect.\n", s_5$pix_sig_neg))
+cat(sprintf("- **%.1f%%** of pixels show a statistically significant DART result.\n", s_5$pix_sig_TOT[1]))
+cat(sprintf("- **%.1f%%** of all pixels show a significant *positive* effect.\n", s_5$pix_sig_TOT[2]))
+cat(sprintf("- **%.1f%%** of all pixels show a significant *negative* effect.\n", s_5$pix_sig_TOT[3]))
 ```
 
 *[Human-readable summary of results for `r names(summaries)[5]` goes here.]*
@@ -518,9 +518,9 @@ Response: **`r print_summary_name(summaries, r_ind, 3)`**
 Objective: **`r print_summary_name(summaries, r_ind, 4)`**
 
 ```{r results-6_8, echo = F}
-cat(sprintf("- **%.1f%%** of pixels show a statistically significant DART result.\n", s_6$pix_sig))
-cat(sprintf("- **%.1f%%** of all pixels show a significant *positive* effect.\n", s_6$pix_sig_pos))
-cat(sprintf("- **%.1f%%** of all pixels show a significant *negative* effect.\n", s_6$pix_sig_neg))
+cat(sprintf("- **%.1f%%** of pixels show a statistically significant DART result.\n", s_6$pix_sig_TOT[1]))
+cat(sprintf("- **%.1f%%** of all pixels show a significant *positive* effect.\n", s_6$pix_sig_TOT[2]))
+cat(sprintf("- **%.1f%%** of all pixels show a significant *negative* effect.\n", s_6$pix_sig_TOT[3]))
 ```
 
 *[Human-readable summary of results for `r names(summaries)[6]` goes here.]*
@@ -590,9 +590,9 @@ Response: **`r print_summary_name(summaries, r_ind, 3)`**
 Objective: **`r print_summary_name(summaries, r_ind, 4)`**
 
 ```{r results-7_8, echo = F}
-cat(sprintf("- **%.1f%%** of pixels show a statistically significant DART result.\n", s_7$pix_sig))
-cat(sprintf("- **%.1f%%** of all pixels show a significant *positive* effect.\n", s_7$pix_sig_pos))
-cat(sprintf("- **%.1f%%** of all pixels show a significant *negative* effect.\n", s_7$pix_sig_neg))
+cat(sprintf("- **%.1f%%** of pixels show a statistically significant DART result.\n", s_7$pix_sig_TOT[1]))
+cat(sprintf("- **%.1f%%** of all pixels show a significant *positive* effect.\n", s_7$pix_sig_TOT[2]))
+cat(sprintf("- **%.1f%%** of all pixels show a significant *negative* effect.\n", s_7$pix_sig_TOT[3]))
 ```
 
 *[Human-readable summary of results for `r names(summaries)[7]` goes here.]*
@@ -662,9 +662,9 @@ Response: **`r print_summary_name(summaries, r_ind, 3)`**
 Objective: **`r print_summary_name(summaries, r_ind, 4)`**
 
 ```{r results-8_8, echo = F}
-cat(sprintf("- **%.1f%%** of pixels show a statistically significant DART result.\n", s_8$pix_sig))
-cat(sprintf("- **%.1f%%** of all pixels show a significant *positive* effect.\n", s_8$pix_sig_pos))
-cat(sprintf("- **%.1f%%** of all pixels show a significant *negative* effect.\n", s_8$pix_sig_neg))
+cat(sprintf("- **%.1f%%** of pixels show a statistically significant DART result.\n", s_8$pix_sig_TOT[1]))
+cat(sprintf("- **%.1f%%** of all pixels show a significant *positive* effect.\n", s_8$pix_sig_TOT[2]))
+cat(sprintf("- **%.1f%%** of all pixels show a significant *negative* effect.\n", s_8$pix_sig_TOT[3]))
 ```
 
 *[Human-readable summary of results for `r names(summaries)[8]` goes here.]*
@@ -734,9 +734,9 @@ Response: **`r print_summary_name(summaries, r_ind, 3)`**
 Objective: **`r print_summary_name(summaries, r_ind, 4)`**
 
 ```{r results-9_8, echo = F}
-cat(sprintf("- **%.1f%%** of pixels show a statistically significant DART result.\n", s_9$pix_sig))
-cat(sprintf("- **%.1f%%** of all pixels show a significant *positive* effect.\n", s_9$pix_sig_pos))
-cat(sprintf("- **%.1f%%** of all pixels show a significant *negative* effect.\n", s_9$pix_sig_neg))
+cat(sprintf("- **%.1f%%** of pixels show a statistically significant DART result.\n", s_9$pix_sig_TOT[1]))
+cat(sprintf("- **%.1f%%** of all pixels show a significant *positive* effect.\n", s_9$pix_sig_TOT[2]))
+cat(sprintf("- **%.1f%%** of all pixels show a significant *negative* effect.\n", s_9$pix_sig_TOT[3]))
 ```
 
 *[Human-readable summary of results for `r names(summaries)[9]` goes here.]*
@@ -806,9 +806,9 @@ Response: **`r print_summary_name(summaries, r_ind, 3)`**
 Objective: **`r print_summary_name(summaries, r_ind, 4)`**
 
 ```{r results-10_8, echo = F}
-cat(sprintf("- **%.1f%%** of pixels show a statistically significant DART result.\n", s_10$pix_sig))
-cat(sprintf("- **%.1f%%** of all pixels show a significant *positive* effect.\n", s_10$pix_sig_pos))
-cat(sprintf("- **%.1f%%** of all pixels show a significant *negative* effect.\n", s_10$pix_sig_neg))
+cat(sprintf("- **%.1f%%** of pixels show a statistically significant DART result.\n", s_10$pix_sig_TOT[1]))
+cat(sprintf("- **%.1f%%** of all pixels show a significant *positive* effect.\n", s_10$pix_sig_TOT[2]))
+cat(sprintf("- **%.1f%%** of all pixels show a significant *negative* effect.\n", s_10$pix_sig_TOT[3]))
 ```
 
 *[Human-readable summary of results for `r names(summaries)[10]` goes here.]*

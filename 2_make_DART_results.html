@@ -1036,8 +1036,241 @@ afg</strong></p>
 <pre><code>## - **27.9%** of pixels show a statistically significant DART result.</code></pre>
 <pre><code>## - **22.5%** of all pixels show a significant *positive* effect.</code></pre>
 <pre><code>## - **5.4%** of all pixels show a significant *negative* effect.</code></pre>
-<p><em>[Human-readable summary of results for decrease_afg_AFG goes
-here.]</em></p>
+<p>The overall DART result here is that treatments were successful in
+5.4% of treated pixels and anti-successful in 22.5% of treated pixels. I
+would hypothesize that the very strong anti-successful result has to do
+with disturbance effects.</p>
+</div>
+<div id="how-should-we-handle-low-sample-sizes" class="section level4">
+<h4>How should we handle low sample sizes?</h4>
+<p>Ecoregions 13i, 14b, 19c have 81, 65, and 84 pixels respectively, and
+can be excluded with a 100 pixel cutoff. Ecoregion 21c has 132 pixels
+and can be excluded with a 500 pixel cutoff, while all of the above plus
+20a (n = 666) can be excluded with a 1000 pixel cutoff. All of these
+ecoregions are represented by 1 polygon in this subset of data. The
+pixel loss each level would be:</p>
+<table>
+<thead>
+<tr class="header">
+<th align="left">Excluded Ecoregions</th>
+<th align="left">Percent Data Lost</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">13i, 14b, 19c</td>
+<td align="left">0.27 %</td>
+</tr>
+<tr class="even">
+<td align="left">13i, 14b, 19c, 21c</td>
+<td align="left">0.42 %</td>
+</tr>
+<tr class="odd">
+<td align="left">13i, 14b, 19c, 21c, 20a</td>
+<td align="left">1.19 %</td>
+</tr>
+</tbody>
+</table>
+<p>Total</p>
+<pre><code>## 
+## Significant pixels, by ecoregion:</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="left">Ecoregion</th>
+<th align="right">Significant Pixels</th>
+<th align="right">Total Pixels</th>
+<th align="right">% Significant Pixels</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">13b</td>
+<td align="right">1406</td>
+<td align="right">15304</td>
+<td align="right">9.19</td>
+</tr>
+<tr class="even">
+<td align="left">13c</td>
+<td align="right">6572</td>
+<td align="right">26584</td>
+<td align="right">24.72</td>
+</tr>
+<tr class="odd">
+<td align="left">13d</td>
+<td align="right">6986</td>
+<td align="right">15669</td>
+<td align="right">44.58</td>
+</tr>
+<tr class="even">
+<td align="left">13i</td>
+<td align="right">0</td>
+<td align="right">81</td>
+<td align="right">0.00</td>
+</tr>
+<tr class="odd">
+<td align="left">14b</td>
+<td align="right">30</td>
+<td align="right">65</td>
+<td align="right">46.15</td>
+</tr>
+<tr class="even">
+<td align="left">18a</td>
+<td align="right">78</td>
+<td align="right">1105</td>
+<td align="right">7.06</td>
+</tr>
+<tr class="odd">
+<td align="left">18d</td>
+<td align="right">281</td>
+<td align="right">1020</td>
+<td align="right">27.55</td>
+</tr>
+<tr class="even">
+<td align="left">19c</td>
+<td align="right">3</td>
+<td align="right">84</td>
+<td align="right">3.57</td>
+</tr>
+<tr class="odd">
+<td align="left">19f</td>
+<td align="right">1759</td>
+<td align="right">4983</td>
+<td align="right">35.30</td>
+</tr>
+<tr class="even">
+<td align="left">19g</td>
+<td align="right">287</td>
+<td align="right">2063</td>
+<td align="right">13.91</td>
+</tr>
+<tr class="odd">
+<td align="left">20a</td>
+<td align="right">460</td>
+<td align="right">666</td>
+<td align="right">69.07</td>
+</tr>
+<tr class="even">
+<td align="left">20c</td>
+<td align="right">2669</td>
+<td align="right">8811</td>
+<td align="right">30.29</td>
+</tr>
+<tr class="odd">
+<td align="left">20e</td>
+<td align="right">741</td>
+<td align="right">2937</td>
+<td align="right">25.23</td>
+</tr>
+<tr class="even">
+<td align="left">20f</td>
+<td align="right">338</td>
+<td align="right">1158</td>
+<td align="right">29.19</td>
+</tr>
+<tr class="odd">
+<td align="left">20g</td>
+<td align="right">874</td>
+<td align="right">1663</td>
+<td align="right">52.56</td>
+</tr>
+<tr class="even">
+<td align="left">21c</td>
+<td align="right">47</td>
+<td align="right">132</td>
+<td align="right">35.61</td>
+</tr>
+<tr class="odd">
+<td align="left">80a</td>
+<td align="right">815</td>
+<td align="right">2828</td>
+<td align="right">28.82</td>
+</tr>
+<tr class="even">
+<td align="left">80b</td>
+<td align="right">784</td>
+<td align="right">1204</td>
+<td align="right">65.12</td>
+</tr>
+</tbody>
+</table>
+<pre><code>## 
+## Significant pixels, by ecoregion, potential exclusions:</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="left">Ecoregion</th>
+<th align="right">Significant Pixels</th>
+<th align="right">Total Pixels</th>
+<th align="right">% Significant Pixels</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">13i</td>
+<td align="right">0</td>
+<td align="right">81</td>
+<td align="right">0.00</td>
+</tr>
+<tr class="even">
+<td align="left">14b</td>
+<td align="right">30</td>
+<td align="right">65</td>
+<td align="right">46.15</td>
+</tr>
+<tr class="odd">
+<td align="left">19c</td>
+<td align="right">3</td>
+<td align="right">84</td>
+<td align="right">3.57</td>
+</tr>
+<tr class="even">
+<td align="left">20a</td>
+<td align="right">460</td>
+<td align="right">666</td>
+<td align="right">69.07</td>
+</tr>
+<tr class="odd">
+<td align="left">21c</td>
+<td align="right">47</td>
+<td align="right">132</td>
+<td align="right">35.61</td>
+</tr>
+</tbody>
+</table>
+<p>13i and 19c look pretty junky, although there might be something to
+the others?</p>
+<p>Treatments are somewhat more complicated.
+<code>soil disturbance</code>,
+<code>prescribed burn;seeding;soil disturbance</code>, and
+<code>prescribed burn;seeding;soil disturbance;vegetation removal</code>
+all have less than 300 samples. Unfortunately, removing these would
+remove “prescribed burn” entirely. Burning may be especially relevant
+for this response category as well (AFG). The sample size reduction for
+removing these three treatments would be:</p>
+<table>
+<colgroup>
+<col width="86%" />
+<col width="13%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="left">Excluded Treatments</th>
+<th align="left">Percent Data Lost</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">soil disturbance, prescribed burn;seeding;soil
+disturbance, prescribed burn;seeding;soil disturbance;vegetation
+removal</td>
+<td align="left">0.68 %</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="what-do-the-results-look-like-graphically" class="section level4">
+<h4>What do the results look like graphically?</h4>
 <hr />
 </div>
 </div>
