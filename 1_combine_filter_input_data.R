@@ -22,7 +22,7 @@
 # R version 
 library(dplyr)
 
-out_file <- '../RestoreDART_DATA/MIXED_MODELS/1_combined_filter_input_data_06032026.csv'
+out_file <- '../RestoreDART_DATA/MIXED_MODELS/1_combined_filter_input_data_06192026.csv'
 tx_key_fl <- '../results/tx_key_BEM.csv'
 
 # import
@@ -145,7 +145,8 @@ dat <- dart |>
   mutate(objective = tolower(objective)) |>
   filter_out(objective %in% c(NA, 'na', 'multi_directional')) |>
   filter_out(grepl('decrease_pfg', objective)) |> # only 63 (==)/ 423 (grep) rows for this objective, 0/40 significant
-  mutate(fun_group = ifelse(fun_group == 'bare', 'bar', fun_group)) |>
+  filter_out(fun_group == 'bare') |>
+  #mutate(fun_group = ifelse(fun_group == 'bare', 'bar', fun_group)) |>
   mutate(fun_group = ifelse(fun_group == 'shrub', 'shr', fun_group)) |>
   mutate(fun_group = ifelse(fun_group == 'tree', 'tre', fun_group)) |>
   mutate(fun_group = toupper(fun_group))

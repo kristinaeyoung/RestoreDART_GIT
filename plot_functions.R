@@ -108,3 +108,61 @@ plot_sig_dart_pix <- function(input_df, ptype = 1, ftype, obj) {
   return(p0)
   
 }
+plot_eco <- function(df, res, obj, eco = NULL, res_col = 'fun_group', obj_col = 'objective', eco_col = 'us_l4name') {
+  
+  require(ggplot2)
+  
+  obj <- tolower(obj)
+  df <- if (!is.null(eco)) df[df[[eco_col]] %in% eco, ]
+  df <- df[df[[res_col]] == res, ]
+  df <- df[grepl(obj, df[[obj_col]]), ]
+  stopifnot(nrow(df) > 0)
+  
+  p_out <- df |>
+    ggplot(aes(x = year_diff, y = effect, col = as.character(sig))) +
+    geom_point() +
+    facet_wrap(~ get(eco_col)) +
+    labs(
+      x = "Years Since Treatment", y = paste0("Effect (", res, ')'),
+      title = 'Overall DART effect through time, ~ ecoregion',
+      subtitle = paste0("(when objective was ", obj, ")"),
+      color = 'DART result\nsignificant?'
+    ) +
+    theme_bw() +
+    theme(
+      axis.text = element_text(color = 'black'), 
+      strip.text = element_text(color = 'black', size = 8),
+      legend.title = element_text(face = 'bold')
+    )
+  
+  return(p_out)
+}
+plot_tx <- function(df, res, obj, tx = NULL, res_col = 'fun_group', obj_col = 'objective', tx_col = 'tx_coarse') {
+  
+  require(ggplot2)
+  
+  obj <- tolower(obj)
+  df <- if (!is.null(tx)) df[df[[tx_col]] %in% tx, ]
+  df <- df[df[[res_col]] == res, ]
+  df <- df[grepl(obj, df[[obj_col]]), ]
+  stopifnot(nrow(df) > 0)
+  
+  p_out <- df |>
+    ggplot(aes(x = year_diff, y = effect, col = as.character(sig))) +
+    geom_point() +
+    facet_wrap(~ get(tx_col)) +
+    labs(
+      x = "Years Since Treatment", y = paste0("Effect (", res, ')'),
+      title = 'Overall DART effect through time, ~ treatment',
+      subtitle = paste0("(when objective was ", obj, ")"),
+      color = 'DART result\nsignificant?'
+    ) +
+    theme_bw() +
+    theme(
+      axis.text = element_text(color = 'black'), 
+      strip.text = element_text(color = 'black', size = 8),
+      legend.title = element_text(face = 'bold')
+    )
+  
+  return(p_out)
+}

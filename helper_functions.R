@@ -14,7 +14,7 @@ split_by_objective <- function(df_in, obj_col = "objective", fun_col = "fun_grou
   
   combos <- expand.grid(objective = all_objectives, fun_group = all_fun_groups, stringsAsFactors = F)
   combos$match_fun_group <- toupper(gsub('.*_', '', combos$objective))
-  combos$match_fun_group[which(combos$fun_group == 'BAR')] <- 'BAR'
+  #combos$match_fun_group[which(combos$fun_group == 'BAR')] <- 'BAR'
   combos <- combos[combos$match_fun_group == combos$fun_group, ]
 
   result <- vector("list", nrow(combos))
@@ -44,7 +44,7 @@ get_summary_DART_results <- function(
     df_in,
     col_polygon  = "polygon",
     col_tx       = "tx_coarse",
-    col_eco      = "us_l4code",
+    col_eco      = "us_l4name",
     col_sig      = "sig",
     col_effect   = "effect",
     bins         = 60
@@ -87,7 +87,7 @@ get_summary_DART_results <- function(
   
   poly_plot <- ggplot(poly_df, aes(x = count)) +
     geom_histogram(bins = poly_n_breaks, fill = "grey35", colour = "white", linewidth = 0.3) +
-    labs(x = "Count", y = "Frequency", title = "Polygon counts\n(for each level of: tx_coarse × us_l4code)") +
+    labs(x = "Count", y = "Frequency", title = paste0("Polygon counts\n(for each level of: ", col_tx, " x ", col_eco, ")")) +
     scale_x_continuous(breaks = seq(max(poly_df))) +
     theme_bw() +
     theme(axis.text = element_text(color = 'black'))
@@ -112,6 +112,7 @@ get_summary_DART_results <- function(
     mutate(pix_sig_perc = round(100 * (pix_sig / pix_n), 2))
   
   return(list(
+    input         = df_in,
     tbl_tx        = tbl_tx,
     tbl_eco       = tbl_eco,
     tbl_tx_eco    = tbl_tx_eco,
