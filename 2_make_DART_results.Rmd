@@ -34,8 +34,11 @@ Caveats/considerations:
 
 - The objective groupings count a pixel as part of an objective if it was present in *any* part of the defined objective. *i.e.*, multi-objective treatments are included in multiple objective groupings, and significant parts of the dataset are counted multiple times in the below figures/tables.
 - Objective/response combinations are only included here if the response was the same as the cover objective. The exception is bare ground, which is shown here in combination with all objectives.
-- I don't know what `null_AFG` means?
-
+- How does time affect the significance of results? Organize/separate out the significance for time in a similiar way to ecoregion and treatment, at least for visualization purposes
+- Should we bin time? Maybe?
+- De-prioritizing final graphs or publication results
+- SE/SD around statistically significant pixels can be shown for overall significance by taking SE/SD around polygons
+- Make a different .Rmd for the models, too much for all in one .Rmd
 ---
 
 ```{r results-1_0, echo = F}
@@ -150,15 +153,31 @@ knitr::kable(excl_tx, col.names = c("Excluded Treatments", "Percent Data Lost"))
 cat('\nSignificant pixels, by treatment, potential exclusions:\n')
 excl_tx_vec <- unique(unlist(strsplit(excl_tx$lab, ', ')))
 knitr::kable(s_1$pix_sig_TX[which(s_1$pix_sig_TX$tx_coarse %in% excl_tx_vec), ], col.names = col_names)
-plot_tx(s_1$input,print_summary_name(summaries, r_ind, 3), gsub(' ', '_', print_summary_name(summaries, r_ind, 4)), excl_tx_vec)
+plot_tx(s_1$input, print_summary_name(summaries, r_ind, 3), gsub(' ', '_', print_summary_name(summaries, r_ind, 4)), excl_tx_vec)
 ```
 
 I don't think we're losing much by dropping them. This cut-off can be 500 also to match the ecoregion cut-off threshold.
 
-#### What do the results look like graphically?
+#### What do the modified results look like graphically?
 
-```{r results-1_15, echo = F}
+- The primary spatial dimension of interest is `us_l4name`, while the primary temporal dimension of interest is `year_diff`. The only relevant explanatory variable at this point in the analysis is `tx_coarse`. 
+- Both significant and non-significant pixels should be plotted.
+- Only post-treatment data should be plotted.
+
+```{r results-1_13, echo = F}
 # this section should look at the significant positive/negative DART pixels and try to figure out why. the very strong anti-successful result is especially interesting
+
+# re-add: `Monticello-Cortez Uplands`
+excl_eco_vec <- excl_eco_vec[-which(excl_eco_vec == 'Monticello-Cortez Uplands')]
+s_1$input <- s_1$input[-which(s_1$input$us_l4name %in% excl_eco_vec), ]
+s_1$input <- s_1$input[-which(s_1$input$tx_coarse %in% excl_tx_vec), ]
+
+# EDITING HERE
+plot_all_DART_sig(s_1$input, gsub(' ', '_', print_summary_name(summaries, r_ind, 4)), 2)
+
+for (i in seq_along(excl_eco_vec)) {
+  plot_all_DART_time(s_1$input, print_summary_name(summaries, r_ind, 3), gsub(' ', '_', print_summary_name(summaries, r_ind, 4)), excl_eco_vec[i])
+}
 ```
 
 ---
@@ -594,217 +613,3 @@ cat(sprintf("- **%.1f%%** of all pixels show a significant *negative* effect.\n"
 *[Human-readable summary of results for `r names(summaries)[7]` goes here.]*
 
 ---
-
-```{r results-8_0, echo = F}
-r_ind <- 8
-s_8 <- summaries[[r_ind]]
-```
-
-### `r print_summary_name(summaries, r_ind, 5)`
-
-#### Pixel counts for each treatment (`'tx_coarse'`)
-
-```{r results-8_1, echo = F}
-knitr::kable(as.data.frame(s_8$tbl_tx), col.names = c("Treatment", "Pixel Count"))
-```
-
-#### Pixel counts by ecoregion (`'us_l4name'`)
-
-```{r results-8_2, echo = F}
-knitr::kable(as.data.frame(s_8$tbl_eco), col.names = c("Ecoregion", "Pixel Count"))
-```
-
-#### Pixel counts for each treatment × ecoregion combination (`'tx_coarse'` x `'us_l4name'`)
-
-```{r results-8_3, echo = F}
-knitr::kable(as.data.frame.matrix(s_8$tbl_tx_eco))
-```
-
-#### Pixel count histograms
-
-This is a histogram of the pixel count table for treatment (`'tx_coarse'`) x ecoregion (`'us_l4name'`).
-
-```{r results-8_4, echo = F}
-s_8$pixel_plot_0
-```
-
-(excluding zeros, *i.e.* no pixels present for that `'tx_coarse'` x `'us_l4name'` combination):
-
-```{r results-8_5, echo = F}
-s_8$pixel_plot_1
-```
-
-#### Polygon counts across ecoregions (`'polygon'` x `'us_l4name'`)
-
-Each polygon is counted once here, regardless of within-polygon pixel counts.
-
-```{r results-8_6, echo = F}
-knitr::kable(as.data.frame.matrix(s_8$tbl_poly))
-```
-
-#### Polygon count histogram
-
-Polygon count table, plotted as histogram, zeroes excluded:
-
-```{r results-8_7, echo = F}
-s_8$poly_plot
-```
-
-#### How many pixels have a significant DART result?
-
-DART results are considered significant if the confidence intervals for each DART estimate do not include zero.
-
-Response: **`r print_summary_name(summaries, r_ind, 3)`**
-Objective: **`r print_summary_name(summaries, r_ind, 4)`**
-
-```{r results-8_8, echo = F}
-cat(sprintf("- **%.1f%%** of pixels show a statistically significant DART result.\n", s_8$pix_sig_TOT[1]))
-cat(sprintf("- **%.1f%%** of all pixels show a significant *positive* effect.\n", s_8$pix_sig_TOT[2]))
-cat(sprintf("- **%.1f%%** of all pixels show a significant *negative* effect.\n", s_8$pix_sig_TOT[3]))
-```
-
-*[Human-readable summary of results for `r names(summaries)[8]` goes here.]*
-
----
-
-```{r results-9_0, echo = F}
-r_ind <- 9
-s_9 <- summaries[[r_ind]]
-```
-
-### `r print_summary_name(summaries, r_ind, 5)`
-
-#### Pixel counts for each treatment (`'tx_coarse'`)
-
-```{r results-9_1, echo = F}
-knitr::kable(as.data.frame(s_9$tbl_tx), col.names = c("Treatment", "Pixel Count"))
-```
-
-#### Pixel counts by ecoregion (`'us_l4name'`)
-
-```{r results-9_2, echo = F}
-knitr::kable(as.data.frame(s_9$tbl_eco), col.names = c("Ecoregion", "Pixel Count"))
-```
-
-#### Pixel counts for each treatment × ecoregion combination (`'tx_coarse'` x `'us_l4name'`)
-
-```{r results-9_3, echo = F}
-knitr::kable(as.data.frame.matrix(s_9$tbl_tx_eco))
-```
-
-#### Pixel count histograms
-
-This is a histogram of the pixel count table for treatment (`'tx_coarse'`) x ecoregion (`'us_l4name'`).
-
-```{r results-9_4, echo = F}
-s_9$pixel_plot_0
-```
-
-(excluding zeros, *i.e.* no pixels present for that `'tx_coarse'` x `'us_l4name'` combination):
-
-```{r results-9_5, echo = F}
-s_9$pixel_plot_1
-```
-
-#### Polygon counts across ecoregions (`'polygon'` x `'us_l4name'`)
-
-Each polygon is counted once here, regardless of within-polygon pixel counts.
-
-```{r results-9_6, echo = F}
-knitr::kable(as.data.frame.matrix(s_9$tbl_poly))
-```
-
-#### Polygon count histogram
-
-Polygon count table, plotted as histogram, zeroes excluded:
-
-```{r results-9_7, echo = F}
-s_9$poly_plot
-```
-
-#### How many pixels have a significant DART result?
-
-DART results are considered significant if the confidence intervals for each DART estimate do not include zero.
-
-Response: **`r print_summary_name(summaries, r_ind, 3)`**
-Objective: **`r print_summary_name(summaries, r_ind, 4)`**
-
-```{r results-9_8, echo = F}
-cat(sprintf("- **%.1f%%** of pixels show a statistically significant DART result.\n", s_9$pix_sig_TOT[1]))
-cat(sprintf("- **%.1f%%** of all pixels show a significant *positive* effect.\n", s_9$pix_sig_TOT[2]))
-cat(sprintf("- **%.1f%%** of all pixels show a significant *negative* effect.\n", s_9$pix_sig_TOT[3]))
-```
-
-*[Human-readable summary of results for `r names(summaries)[9]` goes here.]*
-
----
-
-```{r results-10_0, echo = F}
-r_ind <- 10
-s_10 <- summaries[[r_ind]]
-```
-
-### `r print_summary_name(summaries, r_ind, 5)`
-
-#### Pixel counts for each treatment (`'tx_coarse'`)
-
-```{r results-10_1, echo = F}
-knitr::kable(as.data.frame(s_10$tbl_tx), col.names = c("Treatment", "Pixel Count"))
-```
-
-#### Pixel counts by ecoregion (`'us_l4name'`)
-
-```{r results-10_2, echo = F}
-knitr::kable(as.data.frame(s_10$tbl_eco), col.names = c("Ecoregion", "Pixel Count"))
-```
-
-#### Pixel counts for each treatment × ecoregion combination (`'tx_coarse'` x `'us_l4name'`)
-
-```{r results-10_3, echo = F}
-knitr::kable(as.data.frame.matrix(s_10$tbl_tx_eco))
-```
-
-#### Pixel count histograms
-
-This is a histogram of the pixel count table for treatment (`'tx_coarse'`) x ecoregion (`'us_l4name'`).
-
-```{r results-10_4, echo = F}
-s_10$pixel_plot_0
-```
-
-(excluding zeros, *i.e.* no pixels present for that `'tx_coarse'` x `'us_l4name'` combination):
-
-```{r results-10_5, echo = F}
-s_10$pixel_plot_1
-```
-
-#### Polygon counts across ecoregions (`'polygon'` x `'us_l4name'`)
-
-Each polygon is counted once here, regardless of within-polygon pixel counts.
-
-```{r results-10_6, echo = F}
-knitr::kable(as.data.frame.matrix(s_10$tbl_poly))
-```
-
-#### Polygon count histogram
-
-Polygon count table, plotted as histogram, zeroes excluded:
-
-```{r results-10_7, echo = F}
-s_10$poly_plot
-```
-
-#### How many pixels have a significant DART result?
-
-DART results are considered significant if the confidence intervals for each DART estimate do not include zero.
-
-Response: **`r print_summary_name(summaries, r_ind, 3)`**
-Objective: **`r print_summary_name(summaries, r_ind, 4)`**
-
-```{r results-10_8, echo = F}
-cat(sprintf("- **%.1f%%** of pixels show a statistically significant DART result.\n", s_10$pix_sig_TOT[1]))
-cat(sprintf("- **%.1f%%** of all pixels show a significant *positive* effect.\n", s_10$pix_sig_TOT[2]))
-cat(sprintf("- **%.1f%%** of all pixels show a significant *negative* effect.\n", s_10$pix_sig_TOT[3]))
-```
-
-*[Human-readable summary of results for `r names(summaries)[10]` goes here.]*
