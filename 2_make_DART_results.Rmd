@@ -34,11 +34,34 @@ Caveats/considerations:
 
 - The objective groupings count a pixel as part of an objective if it was present in *any* part of the defined objective. *i.e.*, multi-objective treatments are included in multiple objective groupings, and significant parts of the dataset are counted multiple times in the below figures/tables.
 - Objective/response combinations are only included here if the response was the same as the cover objective. The exception is bare ground, which is shown here in combination with all objectives.
+
+TODO:
+
 - How does time affect the significance of results? Organize/separate out the significance for time in a similiar way to ecoregion and treatment, at least for visualization purposes
 - Should we bin time? Maybe?
 - De-prioritizing final graphs or publication results
 - SE/SD around statistically significant pixels can be shown for overall significance by taking SE/SD around polygons
 - Make a different .Rmd for the models, too much for all in one .Rmd
+- Drop increase_AFG, increase_TRE
+- From table headers in email: "% or # of time this was the objective": out of all presently considered polygons, what percent was this objective?
+- Table for overlapping objectives? I.E. how often do all other objectives overlap with the currently considered objective
+- What year was treatment at its MOST/LEAST effective? MOST/LEAST is quantified by % of significant DART pixels
+- = Mean/min/max/SD and 5/10/15+ year bins for % significant pixels. This answers the question of "when/how far in time was the treatment most significant?" If we do this by-polygon this may get around sample size issues. e.g. "in this polygon year 2 was highest significant out of 15 years", etc. Then summarize these min/max significance years across polygons to get average time effects across treatments/ecoregions. Time series may be censored if the max/min effect occurs at the end of the time series.
+- What is a "non-signiciant" time effect? Or, can we inverse weight the time-series summary statistics by the overall magnitude of significance within that time-series. Can variance metrics (s.d., s.e.) also be weighted? Plot could be: y = mean time to maximum treatment effect, weighted by magnitude of effect, by plylgon; x = treatment/ecoregion. OR: heatmap with x/y treatment/ecoregion and z fill mean time to max significance
+- We need some kind of results that describe how poorly the polygons captured variability in effects through time. i.e. how many of the polygons are being ignored by a weighting scheme?
+- Can this process be repeated for space? Is this just a 'boring boxplot'?
+- Can we quantify stability over time?
+- Standardize polygons based on time series. Make sure that some polygons are not extending the time series and affecting the visualization disproportionately
+- Sample size cut-off for polygons after a given year?
+- Add time sample size tables to Rmd. Specifically: are sample sizes in later years being reduced and affecting results disproportionately?
+- Add time metrics to the table if possible
+-  Things KY love to see:
+  When decrease tree is the goal, what do AFG, SHR, and PFG group directions look like?
+  When increase PFG is the goal, what does AFG directions look like?
+  When decrease SHB was the goal, what does AFG, PFG, TRE directions look like?
+  How significant effects changed through time in a way we can talk about (bins?)
+- KY also love to see a table with the attached headers. 
+
 ---
 
 ```{r results-1_0, echo = F}
