@@ -37,6 +37,7 @@ Caveats/considerations:
 
 TODO:
 
+- Fill out table_restoredart_template.xlsx
 - How does time affect the significance of results? Organize/separate out the significance for time in a similiar way to ecoregion and treatment, at least for visualization purposes
 - Should we bin time? Maybe?
 - De-prioritizing final graphs or publication results
