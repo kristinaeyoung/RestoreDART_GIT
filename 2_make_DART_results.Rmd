@@ -30,39 +30,6 @@ summaries <-in_fl |>
 
 The sections below present the DART result sample sizes for each objective × response combination.
 
-Caveats/considerations:
-
-- The objective groupings count a pixel as part of an objective if it was present in *any* part of the defined objective. *i.e.*, multi-objective treatments are included in multiple objective groupings, and significant parts of the dataset are counted multiple times in the below figures/tables.
-- Objective/response combinations are only included here if the response was the same as the cover objective. The exception is bare ground, which is shown here in combination with all objectives.
-
-TODO:
-
-- Fill out table_restoredart_template.xlsx
-- How does time affect the significance of results? Organize/separate out the significance for time in a similiar way to ecoregion and treatment, at least for visualization purposes
-- Should we bin time? Maybe?
-- De-prioritizing final graphs or publication results
-- SE/SD around statistically significant pixels can be shown for overall significance by taking SE/SD around polygons
-- Make a different .Rmd for the models, too much for all in one .Rmd
-- Drop increase_AFG, increase_TRE
-- From table headers in email: "% or # of time this was the objective": out of all presently considered polygons, what percent was this objective?
-- Table for overlapping objectives? I.E. how often do all other objectives overlap with the currently considered objective
-- What year was treatment at its MOST/LEAST effective? MOST/LEAST is quantified by % of significant DART pixels
-- = Mean/min/max/SD and 5/10/15+ year bins for % significant pixels. This answers the question of "when/how far in time was the treatment most significant?" If we do this by-polygon this may get around sample size issues. e.g. "in this polygon year 2 was highest significant out of 15 years", etc. Then summarize these min/max significance years across polygons to get average time effects across treatments/ecoregions. Time series may be censored if the max/min effect occurs at the end of the time series.
-- What is a "non-signiciant" time effect? Or, can we inverse weight the time-series summary statistics by the overall magnitude of significance within that time-series. Can variance metrics (s.d., s.e.) also be weighted? Plot could be: y = mean time to maximum treatment effect, weighted by magnitude of effect, by plylgon; x = treatment/ecoregion. OR: heatmap with x/y treatment/ecoregion and z fill mean time to max significance
-- We need some kind of results that describe how poorly the polygons captured variability in effects through time. i.e. how many of the polygons are being ignored by a weighting scheme?
-- Can this process be repeated for space? Is this just a 'boring boxplot'?
-- Can we quantify stability over time?
-- Standardize polygons based on time series. Make sure that some polygons are not extending the time series and affecting the visualization disproportionately
-- Sample size cut-off for polygons after a given year?
-- Add time sample size tables to Rmd. Specifically: are sample sizes in later years being reduced and affecting results disproportionately?
-- Add time metrics to the table if possible
--  Things KY love to see:
-  When decrease tree is the goal, what do AFG, SHR, and PFG group directions look like?
-  When increase PFG is the goal, what does AFG directions look like?
-  When decrease SHB was the goal, what does AFG, PFG, TRE directions look like?
-  How significant effects changed through time in a way we can talk about (bins?)
-- KY also love to see a table with the attached headers. 
-
 ---
 
 ```{r results-1_0, echo = F}
@@ -171,13 +138,21 @@ There really doesn't seem to be anything wrong with `Monticello-Cortez Uplands`.
 Treatments are somewhat more complicated. `soil disturbance`, `prescribed burn;seeding;soil disturbance`, and `prescribed burn;seeding;soil disturbance;vegetation removal` all have less than 300 samples. Unfortunately, removing these would remove "prescribed burn" entirely. Burning may be especially relevant for this response category as well (AFG). Here's what those treatments look like:
 
 ```{r results-1_12, echo = F}
-excl_tx <- make_excl_table(s_1, 'tbl_tx', c('soil disturbance', 'prescribed burn;seeding;soil disturbance', 'prescribed burn;seeding;soil disturbance;vegetation removal'))
-knitr::kable(excl_tx, col.names = c("Excluded Treatments", "Percent Data Lost"))
+#excl_tx <- make_excl_table(s_1, 'tbl_tx', c('soil disturbance', 'prescribed burn;seeding;soil disturbance', 'prescribed burn;seeding;soil disturbance;vegetation removal'))
+#knitr::kable(excl_tx, col.names = c("Excluded Treatments", "Percent Data Lost"))
 # are excluded treatments super significant? super not-significant?
-cat('\nSignificant pixels, by treatment, potential exclusions:\n')
-excl_tx_vec <- unique(unlist(strsplit(excl_tx$lab, ', ')))
-knitr::kable(s_1$pix_sig_TX[which(s_1$pix_sig_TX$tx_coarse %in% excl_tx_vec), ], col.names = col_names)
-plot_tx(s_1$input, print_summary_name(summaries, r_ind, 3), gsub(' ', '_', print_summary_name(summaries, r_ind, 4)), excl_tx_vec)
+#cat('\nSignificant pixels, by treatment, potential exclusions:\n')
+#excl_tx_vec <- unique(unlist(strsplit(excl_tx$lab, ', ')))
+#knitr::kable(s_1$pix_sig_TX[which(s_1$pix_sig_TX$tx_coarse %in% excl_tx_vec), ], col.names = col_names)
+#plot_tx(s_1$input, print_summary_name(summaries, r_ind, 3), gsub(' ', '_', print_summary_name(summaries, r_ind, 4)), excl_tx_vec)
+
+print_excl_tbl_tx(
+  s_1, 
+  c('soil disturbance', 'prescribed burn;seeding;soil disturbance', 'prescribed burn;seeding;soil disturbance;vegetation removal'),
+  c("Treatment", "Significant Pixels", "Total Pixels", "% Significant Pixels"),
+  print_summary_name(summaries, r_ind, 3),
+  print_summary_name(summaries, r_ind, 4)
+)
 ```
 
 I don't think we're losing much by dropping them. This cut-off can be 500 also to match the ecoregion cut-off threshold.
@@ -207,74 +182,10 @@ for (i in seq_along(excl_eco_vec)) {
 ---
 
 ```{r results-2_0, echo = F}
-r_ind <- 2
-s_2 <- summaries[[r_ind]]
+#r_ind <- 2
+#print_summary_name(summaries, 2, 5)
+# ind == 2 is "cover:  AFG , objective: increase afg", which should be dropped
 ```
-
-### `r print_summary_name(summaries, r_ind, 5)`
-
-#### Pixel counts for each treatment (`'tx_coarse'`)
-
-```{r results-2_1, echo = F}
-knitr::kable(as.data.frame(s_2$tbl_tx), col.names = c("Treatment", "Pixel Count"))
-```
-
-#### Pixel counts by ecoregion (`'us_l4name'`)
-
-```{r results-2_2, echo = F}
-knitr::kable(as.data.frame(s_2$tbl_eco), col.names = c("Ecoregion", "Pixel Count"))
-```
-
-#### Pixel counts for each treatment × ecoregion combination (`'tx_coarse'` x `'us_l4name'`)
-
-```{r results-2_3, echo = F}
-knitr::kable(as.data.frame.matrix(s_2$tbl_tx_eco))
-```
-
-#### Pixel count histograms
-
-This is a histogram of the pixel count table for treatment (`'tx_coarse'`) x ecoregion (`'us_l4name'`).
-
-```{r results-2_4, echo = F}
-s_2$pixel_plot_0
-```
-
-(excluding zeros, *i.e.* no pixels present for that `'tx_coarse'` x `'us_l4name'` combination):
-
-```{r results-2_5, echo = F}
-s_2$pixel_plot_1
-```
-
-#### Polygon counts across ecoregions (`'polygon'` x `'us_l4name'`)
-
-Each polygon is counted once here, regardless of within-polygon pixel counts.
-
-```{r results-2_6, echo = F}
-knitr::kable(as.data.frame.matrix(s_2$tbl_poly))
-```
-
-#### Polygon count histogram
-
-Polygon count table, plotted as histogram, zeroes excluded:
-
-```{r results-2_7, echo = F}
-s_2$poly_plot
-```
-
-#### How many pixels have a significant DART result?
-
-DART results are considered significant if the confidence intervals for each DART estimate do not include zero.
-
-Response: **`r print_summary_name(summaries, r_ind, 3)`**
-Objective: **`r print_summary_name(summaries, r_ind, 4)`**
-
-```{r results-2_8, echo = F}
-cat(sprintf("- **%.1f%%** of pixels show a statistically significant DART result.\n", s_2$pix_sig_TOT[1]))
-cat(sprintf("- **%.1f%%** of all pixels show a significant *positive* effect.\n", s_2$pix_sig_TOT[2]))
-cat(sprintf("- **%.1f%%** of all pixels show a significant *negative* effect.\n", s_2$pix_sig_TOT[3]))
-```
-
-*[Human-readable summary of results for `r names(summaries)[2]` goes here.]*
 
 ---
 
@@ -289,6 +200,18 @@ s_3 <- summaries[[r_ind]]
 
 ```{r results-3_1, echo = F}
 knitr::kable(as.data.frame(s_3$tbl_tx), col.names = c("Treatment", "Pixel Count"))
+```
+
+Cutoff = 300 doesn't remove anything; cutoff = 500 removes `prescribed burn;seeding;soil disturbance`
+
+```{r results-3_1_sub1, echo = F}
+print_excl_tbl_tx(
+  s_3, 
+  c('prescribed burn;seeding;soil disturbance'),
+  c("Treatment", "Significant Pixels", "Total Pixels", "% Significant Pixels"),
+  print_summary_name(summaries, r_ind, 3),
+  print_summary_name(summaries, r_ind, 4)
+)
 ```
 
 #### Pixel counts by ecoregion (`'us_l4name'`)

@@ -166,3 +166,18 @@ make_excl_table <- function(summary_table, tbl, ...) {
     per = paste(excl_per, '%')
   ))
 }
+print_excl_tbl_tx <- function(s_x, tx, col_names, nm_1, nm_2) {
+  
+  #excl_tx <- make_excl_table(s_1, 'tbl_tx', c('soil disturbance', 'prescribed burn;seeding;soil disturbance', 'prescribed burn;seeding;soil disturbance;vegetation removal'))
+  excl_tx <- make_excl_table(s_x, 'tbl_tx', tx)
+  
+  print(knitr::kable(excl_tx, col.names = c("Excluded Treatments", "Percent Data Lost")))
+  # are excluded treatments super significant? super not-significant?
+  cat('\nSignificant pixels, by treatment, potential exclusions:\n')
+  excl_tx_vec <- unique(unlist(strsplit(excl_tx$lab, ', ')))
+  print(knitr::kable(s_1$pix_sig_TX[which(s_1$pix_sig_TX$tx_coarse %in% excl_tx_vec), ], col.names = col_names))
+  
+  print(plot_tx(s_x[['input']], nm_1, gsub(' ', '_', nm_2), excl_tx_vec))
+  
+  invisible()
+}
