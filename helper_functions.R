@@ -166,18 +166,63 @@ make_excl_table <- function(summary_table, tbl, ...) {
     per = paste(excl_per, '%')
   ))
 }
-print_excl_tbl_tx <- function(s_x, tx, col_names, nm_1, nm_2) {
+reduce_s0 <- function(input, coarse_tx = T) {
+  # turns s_0$input into a summary table required by table_restoredart_template.xlsx
   
-  #excl_tx <- make_excl_table(s_1, 'tbl_tx', c('soil disturbance', 'prescribed burn;seeding;soil disturbance', 'prescribed burn;seeding;soil disturbance;vegetation removal'))
-  excl_tx <- make_excl_table(s_x, 'tbl_tx', tx)
+  require(dplyr)
   
-  print(knitr::kable(excl_tx, col.names = c("Excluded Treatments", "Percent Data Lost")))
-  # are excluded treatments super significant? super not-significant?
-  cat('\nSignificant pixels, by treatment, potential exclusions:\n')
-  excl_tx_vec <- unique(unlist(strsplit(excl_tx$lab, ', ')))
-  print(knitr::kable(s_1$pix_sig_TX[which(s_1$pix_sig_TX$tx_coarse %in% excl_tx_vec), ], col.names = col_names))
+  # need total pixels per objective/cover type/ecoregion/treatment/year
+  if (coarse_tx) {
+    obj_list <- input$objective |>
+      unique() |>
+      strsplit(',') |>
+      lapply(trimws)
+    single_obj <- Reduce(intersect, obj_list)
+    stopifnot(length(single_obj) == 1)
+    input$objective <- rep(single_obj, nrow(input))
+    
+    if (!('intended_direction' %in% colnames(input))) {
+      int_dir <- input$objective |>
+        unique() |>
+        strsplit('_') |>
+        unlist() |>
+        subset(c(T, F))
+      
+      if (int_dir == 'decrease') {
+        input$intended_direction <- ifelse(input$effect < 0, T, F)
+      } else if (int_dir == 'increase') {
+        input$intended_direction <- ifelse(input$effect > 0, T, F)
+      } else {
+        stop('intended direction assignment failed')
+      }
+      
+      #input$desired <- rowSums(data.frame(input$sig, input$intended_direction))
+      input$sig_des <- input$sig == T & input$intended_direction == T
+      input$sig_und <- input$sig == T & input$intended_direction == F
+      
+    } else {
+      stop('need to code intended direction for the fine tx categories')
+    }
+  }
   
-  print(plot_tx(s_x[['input']], nm_1, gsub(' ', '_', nm_2), excl_tx_vec))
+  output <- input |>
+    #dplyr::group_by(objective, fun_group, us_l4name, tx_coarse, year_RAP) |>
+    # dont group by year for now
+    dplyr::group_by(objective, fun_group, tx_coarse, us_l4name) |>
+    dplyr::summarize(
+      grp_n_pix = dplyr::n(),
+      grp_n_poly = length(unique(polygon)),
+      
+      grp_n_sig = sum(sig),
+      grp_n_sig_int = sum(sig_des),
+      grp_n_sig_uni = sum(sig_und),
+      
+      grp_perc_sig = round((grp_n_sig / grp_n_pix) * 100, 2),
+      grp_perc_int = round((grp_n_sig_int / grp_n_sig) * 100, 2),
+      grp_perc_uni = round((grp_n_sig_uni / grp_n_sig) * 100, 2),
+      .groups = 'drop_last'
+    )
   
-  invisible()
+  return(output)
+  
 }
