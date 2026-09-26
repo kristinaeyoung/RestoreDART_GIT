@@ -242,64 +242,8 @@ print_tx_eco_trunc_table <- function(rm_tx, rm_eco, tbl, thr) {
   old <- options(knitr.kable.NA = "")
   on.exit(options(old))
   
-  # Return the kable objects rather than print()-ing them here: calling print()
-  # directly on a knitr_kable inside a helper function bypasses knitr's own
-  # print-interception (which dispatches to knit_print.knitr_kable and renders a
-  # proper HTML table), so it was falling back to base print.default and dumping
-  # raw pipe-table text as plain, unrendered text. Returning them instead lets the
-  # calling chunk auto-print each one (with the chunk option results='asis' set),
-  # which renders them correctly.
-  list(
-    full   = knitr::kable(as.data.frame.matrix(full), na = ""),
-    sparse = knitr::kable(as.data.frame.matrix(sm), na = "")
-  )
-  
-}
-compare_related_directions <- function(
-    df_in, target_objective, related_fun_groups,
-    obj_col = 'objective', fun_col = 'fun_group', sig_col = 'sig', effect_col = 'effect'
-) {
-  # Compares what happened to OTHER cover responses while `target_objective` was
-  # being pursued - e.g. when the objective was "decrease_tre", what did AFG, SHR
-  # and PFG cover do in those same treated pixels?
-  #
-  # This works on the *raw combined data* (df_in), not on `summaries`, because
-  # split_by_objective() only ever pairs an objective with its own matching cover
-  # response (decrease_afg <-> AFG, etc.) - it never keeps, say, the SHR rows for
-  # pixels where the objective was decrease_tre. To look at those other responses
-  # we have to re-filter the combined data directly.
-  
-  require(dplyr)
-  require(ggplot2)
-  
-  df <- df_in[grepl(target_objective, df_in[[obj_col]]), ]
-  df <- df[df[[fun_col]] %in% related_fun_groups, ]
-  df <- df[df$year_diff > 0, ]
-  
-  stopifnot(nrow(df) > 0)
-  
-  tbl <- df |>
-    group_by(.data[[fun_col]]) |>
-    summarise(
-      n_pix       = n(),
-      pct_sig     = round(100 * mean(.data[[sig_col]]), 2),
-      pct_sig_pos = round(100 * mean(.data[[sig_col]] & .data[[effect_col]] > 0), 2),
-      pct_sig_neg = round(100 * mean(.data[[sig_col]] & .data[[effect_col]] < 0), 2),
-      .groups = 'drop'
-    )
-  
-  p0 <- df |>
-    ggplot(aes(x = .data[[fun_col]], fill = as.character(.data[[sig_col]]))) +
-    geom_bar(position = 'fill') +
-    labs(
-      x = 'Cover response', y = 'Proportion of pixels',
-      fill = 'DART result\nsignificant?',
-      title = paste0('Cover responses when the objective was "', target_objective, '"')
-    ) +
-    theme_bw() +
-    theme(axis.text = element_text(color = 'black'))
-  
-  return(list(table = tbl, plot = p0, data = df))
+  print(knitr::kable(as.data.frame.matrix(full), na = ""))
+  print(knitr::kable(as.data.frame.matrix(sm), na = ""))
   
 }
 summarize_sig_effect <- function(
