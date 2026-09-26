@@ -19,6 +19,7 @@ in_fl   <- '../RestoreDART_DATA/MIXED_MODELS/1_combined_filter_input_data_061920
 # is named as `[direction]_[cover]_[RESPONSE]`, where the combination of direction and cover
 # describes a treatment **objective**, and `RESPONSE` describes the (differenced) RAP cover response variable.
 
+# TODO: drop objectives "increase_afg" and "increase_tre" from the `summaries` object
 summaries <-in_fl |>
   read.csv() |>
   split_by_objective() |>
@@ -63,6 +64,7 @@ knitr::kable(as.data.frame(s_0$tbl_eco), col.names = c("Ecoregion", "Pixel Count
 We use a lower cutoff here (`r min_txeco_n` pixels) than we would at the treatment or ecoregion level individually, since the treatment × ecoregion combination is the finest-grained grouping used in the models below, and is where sparse cells actually show up - a treatment or ecoregion can look fine in the tables above while still having a handful of near-empty combinations underneath it.
 
 ```{r results-1_3, echo = F}
+# TODO: this needs to be converted to a kable to fix formatting issues
 print_tx_eco_trunc_table(character(0), character(0), s_0$tbl_tx_eco, min_txeco_n)
 ```
 
@@ -177,6 +179,7 @@ Response: **`r print_summary_name(summaries, r_ind, 3)`**
 Objective: **`r print_summary_name(summaries, r_ind, 4)`**
 
 ```{r results-1_12, echo = F}
+# TODO: SE/SD around statistically significant pixels can be shown for overall significance by taking SE/SD around polygons that contain those pixels
 cat(sprintf("- **%.1f%%** of pixels show a statistically significant DART result.\n", s_0$pix_sig_TOT[1]))
 cat(sprintf("- **%.1f%%** of all pixels show a significant *positive* effect.\n", s_0$pix_sig_TOT[2]))
 cat(sprintf("- **%.1f%%** of all pixels show a significant *negative* effect.\n", s_0$pix_sig_TOT[3]))
@@ -270,3 +273,33 @@ for (i in seq_along(eco_list)) {
 ```
 
 For the `decrease_afg` objective, the green bars should generally reflect a negative DART effect (i.e. occur below the zero line). Significant results above the zero line would indicate that the treatment is not working. Red bars neither support nor refute treatment efficacy. 
+
+```{r results-1_17, echo = F}
+# code chunk for exploring time variance within this dataset
+
+# TODO: How does time affect the significance of results? Organize/separate out the significance for time in a similiar way to ecoregion and treatment, at least for visualization purposes. Use this code chunk.
+
+# TODO: Answer the question of: what year was treatment at its MOST/LEAST effective? MOST/LEAST is quantified by % of significant DART pixels
+
+# TODO: Create/visualize mean/min/max/SD and 5/10/15+ year bins for % significant pixels. This answers the question of "when/how far in time was the treatment most significant?" If we do this by-polygon this may get around sample size issues. e.g. "in this polygon year 2 was highest significant out of 15 years", etc. Then summarize these min/max significance years across polygons to get average time effects across treatments/ecoregions. Time series may be censored if the max/min effect occurs at the end of the time series.
+
+# TODO: Answer the question of: what is a "non-signiciant" time effect? Or, can we inverse weight the time-series summary statistics by the overall magnitude of significance within that time-series. Can variance metrics (s.d., s.e.) also be weighted? Plot could be: y = mean time to maximum treatment effect, weighted by magnitude of effect, by plylgon; x = treatment/ecoregion. OR: heatmap with x/y treatment/ecoregion and z fill mean time to max significance
+
+```
+
+```{r results-1_18, echo = F}
+# TODO: create a table for overlapping objectives, i.e. how often do all other objectives overlap with the currently considered objective
+```
+
+```{r results_total, echo = F}
+#TODO: Find a table/plot approach that answers the following questions:
+# * When decrease tree is the goal, what do AFG, SHR, and PFG group directions look like?
+# * When increase PFG is the goal, what does AFG directions look like?
+# * When decrease SHB was the goal, what does AFG, PFG, TRE directions look like?
+# While decrease_afg is the only objective being examined for drafting (results-1_XX), this can be also be drafted, and tested later
+```
+
+```{r summary_table, echo = F}
+# TODO: add a summary table here with the following columns: "% or # of time this was the objective",	"Objective", "Cover response", "Treatment method", "Ecoregion", "Total pixels", "Number polygons", "# of pixels Significant", "# of Significant pixels, intended", "# of Significant pixels, unintended", "% significant pixels intended", "% significant pixels unintended". "Objective", "Cover response", "Treatment method", and "Ecoregion" refer directly to the "objective", "fun_group", "tx_coarse", and "us_l4name" columns in the data. The helper function "reduce_s0" can be used/modified for this purpose. If this is the case, "grp_n_pix" identifies "Total pixels", "grp_n_poly" identifies "Number polygons", "grp_n_sig" identifies "# of pixels Significant", "grp_n_sig_int" identifies "# of Significant pixels, intended", "grp_n_sig_uni" identifies "# of Significant pixels, unintended", "grp_perc_int" identifies "% significant pixels intended", and "grp_perc_uni" identifies "% significant pixels unintended". reduce_s0 may need to be modified to allow the intended direction to be specified directly rather than from the data. "% or # of time this was the objective" can be summarised as: out of all  polygons in the greater dataset (i.e. across all elements of `summaries`), what percent was this particular objective?
+# This summary table can be drafted for the decrease_afg objective (results-1_XX) and expanded when other objectives are added.
+```
