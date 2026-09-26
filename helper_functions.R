@@ -226,3 +226,23 @@ reduce_s0 <- function(input, coarse_tx = T) {
   return(output)
   
 }
+print_tx_eco_trunc_table <- function(rm_tx, rm_eco, tbl, thr) {
+  
+  full <- tbl
+  if (length(rm_tx))  full <- full[-which(rownames(full) %in% rm_tx), , drop = FALSE]
+  if (length(rm_eco)) full <- full[, -which(colnames(full) %in% rm_eco), drop = FALSE]
+  
+  sm <- full
+  sm[sm >= thr] <- NA
+  sm[sm == 0]   <- NA
+  k_r <- rowSums(!is.na(sm)) > 0
+  k_c <- colSums(!is.na(sm)) > 0
+  sm  <- sm[k_r, k_c, drop = FALSE]
+  
+  old <- options(knitr.kable.NA = "")
+  on.exit(options(old))
+  
+  print(knitr::kable(as.data.frame.matrix(full), na = ""))
+  print(knitr::kable(as.data.frame.matrix(sm), na = ""))
+  
+}

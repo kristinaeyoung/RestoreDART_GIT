@@ -133,29 +133,31 @@ cat('\nTotal data lost from removing small treatments and ecoregions: ', round((
 
 #### Pixel counts for each treatment × ecoregion combination (`'tx_coarse'` x `'us_l4name'`)
 
-```{r results-1_7, echo = F}
-knitr::kable(as.data.frame.matrix(s_0$tbl_tx_eco))
-```
-
-#### Pixel count histograms
-
-This is a histogram of the pixel count table for treatment (`'tx_coarse'`) x ecoregion (`'us_l4name'`).
-
 ```{r results-1_8, echo = F}
-s_0$pixel_plot_0
+print_tx_eco_trunc_table(rm_tx, rm_eco, s_0$tbl_tx_eco, 300)
 ```
 
-(excluding zeros, *i.e.* no pixels present for that `'tx_coarse'` x `'us_l4name'` combination):
+11 treatment by ecoregion combinations have sample sizes less than 300. It might be worth it to do the filtering at this stage, rather than at the treatment and ecoregion level independently.
 
-```{r results-1_9, echo = F}
-s_0$pixel_plot_1
-```
+<!-- #### Pixel count histograms -->
+
+<!-- This is a histogram of the pixel count table for treatment (`'tx_coarse'`) x ecoregion (`'us_l4name'`). -->
+
+<!-- ```{r results-1_9, echo = F} -->
+<!-- s_0$pixel_plot_0 -->
+<!-- ``` -->
+
+<!-- (excluding zeros, *i.e.* no pixels present for that `'tx_coarse'` x `'us_l4name'` combination): -->
+
+<!-- ```{r results-1_10, echo = F} -->
+<!-- s_0$pixel_plot_1 -->
+<!-- ``` -->
 
 #### Polygon counts across ecoregions (`'polygon'` x `'us_l4name'`)
 
 Each polygon is counted once here, regardless of within-polygon pixel counts.
 
-```{r results-1_10, echo = F}
+```{r results-1_9, echo = F}
 knitr::kable(as.data.frame.matrix(s_0$tbl_poly))
 ```
 
@@ -163,7 +165,7 @@ knitr::kable(as.data.frame.matrix(s_0$tbl_poly))
 
 Polygon count table, plotted as histogram, zeroes excluded:
 
-```{r results-1_11, echo = F}
+```{r results-1_10, echo = F}
 s_0$poly_plot
 ```
 
@@ -174,7 +176,7 @@ DART results are considered significant if the confidence intervals for each DAR
 Response: **`r print_summary_name(summaries, r_ind, 3)`**
 Objective: **`r print_summary_name(summaries, r_ind, 4)`**
 
-```{r results-1_12, echo = F}
+```{r results-1_11, echo = F}
 cat(sprintf("- **%.1f%%** of pixels show a statistically significant DART result.\n", s_0$pix_sig_TOT[1]))
 cat(sprintf("- **%.1f%%** of all pixels show a significant *positive* effect.\n", s_0$pix_sig_TOT[2]))
 cat(sprintf("- **%.1f%%** of all pixels show a significant *negative* effect.\n", s_0$pix_sig_TOT[3]))
@@ -188,20 +190,14 @@ The overall DART result here is that treatments were successful in 5.4% of treat
 - Both significant and non-significant pixels should be plotted.
 - Only post-treatment data should be plotted.
 
-```{r results-1_13, echo = F}
+```{r results-1_12, echo = F}
 # this section should look at the significant positive/negative DART pixels and try to figure out why. the very strong anti-successful result is especially interesting
 
-# re-add: `Monticello-Cortez Uplands`
-# excl_eco_vec <- excl_eco_vec[-which(excl_eco_vec == 'Monticello-Cortez Uplands')]
-# s_0$input <- s_0$input[-which(s_0$input$us_l4name %in% excl_eco_vec), ]
-# s_0$input <- s_0$input[-which(s_0$input$tx_coarse %in% excl_tx_vec), ]
-
-# EDITING HERE
-# plot_all_DART_sig(s_0$input, gsub(' ', '_', print_summary_name(summaries, r_ind, 4)), 2)
-# 
-# for (i in seq_along(excl_eco_vec)) {
-#  plot_all_DART_time(s_0$input, print_summary_name(summaries, r_ind, 3), gsub(' ', '_', print_summary_name(summaries, r_ind, 4)), excl_eco_vec[i])
-# }
+plot_all_DART_sig(s_0$input, gsub(' ', '_', print_summary_name(summaries, r_ind, 4)), 2)
+ 
+for (i in seq_along(excl_eco_vec)) {
+  plot_all_DART_time(s_0$input, print_summary_name(summaries, r_ind, 3), gsub(' ', '_', print_summary_name(summaries, r_ind, 4)), excl_eco_vec[i])
+ }
 ```
 
 ---
