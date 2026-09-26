@@ -37,12 +37,7 @@ The sections below present the DART result sample sizes for each objective × re
 r_ind <- 1
 s_0 <- summaries[[r_ind]]
 
-# Sample-size threshold applied to each treatment x ecoregion combination. Sparse combinations are
-# dropped at this level *before* any treatment- or ecoregion-level exclusion is considered on its
-# own: a treatment or ecoregion can have a perfectly healthy total sample size while still having
-# specific combinations with almost no data, and dropping whole treatments/ecoregions based on
-# marginal totals alone can end up discarding more data than necessary, or missing sparse cells
-# entirely.
+# Sample-size threshold applied to each treatment x ecoregion combination
 min_txeco_n <- 300
 ```
 
@@ -71,8 +66,6 @@ We use a lower cutoff here (`r min_txeco_n` pixels) than we would at the treatme
 print_tx_eco_trunc_table(character(0), character(0), s_0$tbl_tx_eco, min_txeco_n)
 ```
 
-*[Once run: summarize how many treatment × ecoregion combinations fall below `r min_txeco_n` pixels, and note anything (e.g. a treatment being dropped everywhere, or a specific ecoregion) that stands out.]*
-
 ```{r results-1_4, echo = F}
 tbl_combo <- s_0$tbl_tx_eco
 low_idx   <- which(tbl_combo > 0 & tbl_combo < min_txeco_n, arr.ind = TRUE)
@@ -100,16 +93,15 @@ Are these sparse combinations especially significant (or non-significant)?
 col_names <- c("Treatment", "Ecoregion", "Significant Pixels", "Total Pixels", "% Significant Pixels")
 
 pix_sig_TXECO <- s_0$input |>
-  group_by(tx_coarse, us_l4name) |>
-  summarise(pix_sig = sum(sig), pix_n = n(), .groups = 'drop') |>
-  mutate(pix_sig_perc = round(100 * (pix_sig / pix_n), 2))
+  dplyr::group_by(tx_coarse, us_l4name) |>
+  dplyr::summarise(pix_sig = sum(sig), pix_n = dplyr::n(), .groups = 'drop') |>
+  dplyr::mutate(pix_sig_perc = round(100 * (pix_sig / pix_n), 2))
 
 knitr::kable(
-  semi_join(pix_sig_TXECO, excl_combo, by = c('tx_coarse', 'us_l4name')),
+  dplyr::semi_join(pix_sig_TXECO, excl_combo, by = c('tx_coarse', 'us_l4name')),
   col.names = col_names
 )
 ```
-
 
 #### Results after drops
 
@@ -122,7 +114,7 @@ eco_bef <- unique(s_0$input$us_l4name)
 s0_summary_bef <- reduce_s0(s_0$input)
 n_pix_bef <- sum(s0_summary_bef$grp_n_pix)
 
-trimmed_input <- anti_join(s_0$input, excl_combo, by = c('tx_coarse', 'us_l4name'))
+trimmed_input <- dplyr::anti_join(s_0$input, excl_combo, by = c('tx_coarse', 'us_l4name'))
 s_0 <- get_summary_DART_results(trimmed_input)
 
 s0_summary_aft <- reduce_s0(s_0$input)
@@ -190,63 +182,23 @@ cat(sprintf("- **%.1f%%** of all pixels show a significant *positive* effect.\n"
 cat(sprintf("- **%.1f%%** of all pixels show a significant *negative* effect.\n", s_0$pix_sig_TOT[3]))
 ```
 
-The overall DART result here is that 28.1% of all DART pixels were significant. Treatments were successful in 5.4% of treated pixels and anti-successful in 22.7% of treated pixels, relative to the assigned objective I would hypothesize that the very strong anti-successful result has to do with disturbance effects or the interact effects of compound objectives.
+The overall DART result here is that 28.1% of all DART pixels were significant. Treatments were successful in 5.4% of treated pixels and anti-successful in 22.7% of treated pixels, relative to the assigned objective. I would hypothesize that the very strong anti-successful result has to do with disturbance effects or the interact effects of compound objectives.
 
 ```{r results-1_13, echo = F}
-sig_pos_by_obj <- s_0$input |>
-  mutate(sig_pos = sig == TRUE & effect > 0) |>
-  group_by(objective) |>
-  summarise(
-    n_pix       = n(),
-    n_sig_pos   = sum(sig_pos),
-    pct_sig_pos = round(100 * n_sig_pos / n_pix, 2),
-    .groups     = 'drop'
-  ) |>
-  arrange(desc(pct_sig_pos))
+res_obj <- summarize_sig_effect(
+  s_0$input, group_col = 'objective', effect_dir = 'positive',
+  baseline = 'decrease_afg', label = 'Objective'
+)
 
 knitr::kable(
-  sig_pos_by_obj,
+  res_obj$summary,
   col.names = c('Objective', 'Total Pixels', 'Significant Positive Pixels', '% Significant Positive')
 )
 
-sig_pos_by_obj |>
-  ggplot(aes(x = reorder(objective, pct_sig_pos), y = pct_sig_pos)) +
-  geom_col(fill = 'grey35') +
-  coord_flip() +
-  labs(
-    x = 'Objective', y = '% of pixels with a significant positive effect',
-    title = 'Significant positive DART effects, by \n(complex) objective category'
-  ) +
-  theme_bw() +
-  theme(axis.text = element_text(color = 'black'))
-
-# Pairwise comparison: is each complex objective's significant-positive rate different from the
-# decrease_afg baseline specifically? Fisher's exact test is used per pair (rather than a
-# proportions test) since it's exact/distribution-free and doesn't depend on a large-sample normal
-# approximation, which matters if some objective categories turn out to be sparse.
-baseline_obj <- 'decrease_afg'
-other_objs   <- setdiff(unique(s_0$input$objective), baseline_obj)
-
-pairwise_res <- lapply(other_objs, function(obj_i) {
-  sub_df   <- s_0$input[s_0$input$objective %in% c(baseline_obj, obj_i), ]
-  sub_flag <- sub_df$sig == TRUE & sub_df$effect < 0
-  ft <- fisher.test(table(sub_df$objective, sub_flag))
-
-  data.frame(
-    objective                 = obj_i,
-    n_pix                     = sum(sub_df$objective == obj_i),
-    pct_sig_pos               = round(100 * mean(sub_flag[sub_df$objective == obj_i]), 2),
-    baseline_pct_sig_pos      = round(100 * mean(sub_flag[sub_df$objective == baseline_obj]), 2),
-    p_value                   = ft$p.value
-  )
-})
-
-pairwise_res <- do.call(rbind, pairwise_res)
-pairwise_res$p_adj <- p.adjust(pairwise_res$p_value, method = 'holm')
-pairwise_res <- pairwise_res[order(pairwise_res$p_adj), ]
+res_obj$plot
 
 knitr::kable(
-  pairwise_res, digits = 4,
+  res_obj$pairwise, digits = 4,
   col.names = c('Objective', 'N Pixels', '% Sig. Positive', 'Baseline % Sig. Positive', 'Raw p-value', 'Holm-adjusted p-value')
 )
 ```
@@ -256,94 +208,39 @@ While some complex objectives are significantly different from `decrease_afg` al
 Repeated for treatment:
 
 ```{r results-1_14, echo = F}
-sig_pos_by_tx <- s_0$input |>
-  mutate(sig_pos = sig == TRUE & effect > 0) |>
-  group_by(tx_coarse) |>
-  summarise(
-    n_pix       = n(),
-    n_sig_pos   = sum(sig_pos),
-    pct_sig_pos = round(100 * n_sig_pos / n_pix, 2),
-    .groups     = 'drop'
-  ) |>
-  arrange(desc(pct_sig_pos))
+res_tx <- summarize_sig_effect(
+  s_0$input, group_col = 'tx_coarse', effect_dir = 'positive', label = 'Treatment'
+)
 
 knitr::kable(
-  sig_pos_by_tx,
+  res_tx$summary,
   col.names = c('Treatment', 'Total Pixels', 'Significant Positive Pixels', '% Significant Positive')
 )
 
-sig_pos_by_tx |>
-  ggplot(aes(x = reorder(tx_coarse, pct_sig_pos), y = pct_sig_pos)) +
-  geom_col(fill = 'grey35') +
-  coord_flip() +
-  labs(
-    x = 'Treatment', y = '% of pixels with a significant positive effect',
-    title = 'Significant positive DART effects, by treatment'
-  ) +
-  theme_bw() +
-  theme(axis.text = element_text(color = 'black'))
-
-# Pairwise comparison against a baseline treatment. No baseline was specified for this factor, so
-# it defaults to the treatment with the largest sample size - change `baseline_tx` below if a
-# different reference treatment (e.g. an untreated control) makes more sense.
-baseline_tx <- sig_pos_by_tx$tx_coarse[which.max(sig_pos_by_tx$n_pix)]
-other_tx    <- setdiff(unique(s_0$input$tx_coarse), baseline_tx)
-
-pairwise_tx <- lapply(other_tx, function(tx_i) {
-  sub_df   <- s_0$input[s_0$input$tx_coarse %in% c(baseline_tx, tx_i), ]
-  sub_flag <- sub_df$sig == TRUE & sub_df$effect < 0
-  ft <- fisher.test(table(sub_df$tx_coarse, sub_flag))
-
-  data.frame(
-    tx_coarse            = tx_i,
-    n_pix                = sum(sub_df$tx_coarse == tx_i),
-    pct_sig_pos          = round(100 * mean(sub_flag[sub_df$tx_coarse == tx_i]), 2),
-    baseline_pct_sig_pos = round(100 * mean(sub_flag[sub_df$tx_coarse == baseline_tx]), 2),
-    p_value              = ft$p.value
-  )
-})
-
-pairwise_tx <- do.call(rbind, pairwise_tx)
-pairwise_tx$p_adj <- p.adjust(pairwise_tx$p_value, method = 'holm')
-pairwise_tx <- pairwise_tx[order(pairwise_tx$p_adj), ]
+res_tx$plot
 
 knitr::kable(
-  pairwise_tx, digits = 4,
+  res_tx$pairwise, digits = 4,
   col.names = c('Treatment', 'N Pixels', '% Sig. Positive', 'Baseline % Sig. Positive', 'Raw p-value', 'Holm-adjusted p-value')
 )
 ```
 
-Here the pairwise baseline treatment is `seeding` because of its high sample size and second-lowest negative effect rate. Again, the pattern is not helpful in explaining itself.
+Here the pairwise baseline treatment is `r res_tx$baseline` because of its high sample size and second-lowest positive effect rate. Again, the pattern is not helpful in explaining itself.
 
 And finally, for ecoregion:
 
 ```{r results-1_15, echo = F}
-sig_pos_by_eco <- s_0$input |>
-  mutate(sig_pos = sig == TRUE & effect > 0) |>
-  group_by(us_l4name) |>
-  summarise(
-    n_pix       = n(),
-    n_sig_pos   = sum(sig_pos),
-    pct_sig_pos = round(100 * n_sig_pos / n_pix, 2),
-    .groups     = 'drop'
-  ) |>
-  arrange(desc(pct_sig_pos))
+res_eco <- summarize_sig_effect(
+  s_0$input, group_col = 'us_l4name', effect_dir = 'positive',
+  run_pairwise = FALSE, label = 'Ecoregion'
+)
 
 knitr::kable(
-  sig_pos_by_eco,
+  res_eco$summary,
   col.names = c('Ecoregion', 'Total Pixels', 'Significant Positive Pixels', '% Significant Positive')
 )
 
-sig_pos_by_eco |>
-  ggplot(aes(x = reorder(us_l4name, pct_sig_pos), y = pct_sig_pos)) +
-  geom_col(fill = 'grey35') +
-  coord_flip() +
-  labs(
-    x = 'Ecoregion', y = '% of pixels with a significant positive effect',
-    title = 'Significant positive DART effects, by ecoregion'
-  ) +
-  theme_bw() +
-  theme(axis.text = element_text(color = 'black'))
+res_eco$plot
 ```
 
 There are too many categories here to make pairwise comparisons helpful. I don't have enough personal knowledge to guess why `Uinta Basin Floor` was so much higher than the other ecoregions.
@@ -355,16 +252,7 @@ There are too many categories here to make pairwise comparisons helpful. I don't
 - Only post-treatment data should be plotted.
 
 ```{r results-1_16, echo = F}
-# Spatial overview: proportion of significant pixels by treatment (y) x years-since-treatment (x),
-# faceted by ecoregion (`us_l4name`) since that's the primary spatial dimension of interest here.
-# ptype = 1 (rather than 2) is used specifically so the ecoregion facets are shown, instead of
-# collapsing all ecoregions onto the same tx_coarse x year_diff grid.
 plot_all_DART_sig(s_0$input, gsub(' ', '_', print_summary_name(summaries, r_ind, 4)), 1)
-
-# for each ecoregion still in the data after the results-1_7 exclusions, look at the
-# effect size and direction (bar height/sign) split by significance (fill) and treatment (facet)
-# through time. This is meant to help localize where the strong "anti-successful" (significant
-# positive) result documented above is concentrated.
 
 eco_list <- sort(unique(s_0$input$us_l4name))
 
@@ -381,4 +269,4 @@ for (i in seq_along(eco_list)) {
 }
 ```
 
-For the `decrease_afg` objective, the green bars should generally reflect a negative DART effect (i.e. occur below the zero line). Significant results above the zero line would indicate that the treatment is not working. Red bars neither support or refute treatment efficacy. 
+For the `decrease_afg` objective, the green bars should generally reflect a negative DART effect (i.e. occur below the zero line). Significant results above the zero line would indicate that the treatment is not working. Red bars neither support nor refute treatment efficacy. 

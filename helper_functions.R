@@ -246,3 +246,67 @@ print_tx_eco_trunc_table <- function(rm_tx, rm_eco, tbl, thr) {
   print(knitr::kable(as.data.frame.matrix(sm), na = ""))
   
 }
+summarize_sig_effect <- function(
+    df, group_col, effect_dir = c('positive', 'negative'),
+    baseline = NULL, run_pairwise = TRUE, label = group_col,
+    sig_col = 'sig', effect_col = 'effect'
+) {
+  
+  effect_dir <- match.arg(effect_dir)
+  cmp <- if (effect_dir == 'positive') `>` else `<`
+  
+  df$.sig_flag <- df[[sig_col]] == TRUE & cmp(df[[effect_col]], 0)
+  
+  grp_summary <- df |>
+    dplyr::group_by(dplyr::across(dplyr::all_of(group_col))) |>
+    dplyr::summarise(
+      n_pix   = dplyr::n(),
+      n_sig   = sum(.sig_flag),
+      pct_sig = round(100 * n_sig / n_pix, 2),
+      .groups = 'drop'
+    ) |>
+    dplyr::arrange(dplyr::desc(pct_sig))
+  
+  p0 <- grp_summary |>
+    ggplot2::ggplot(ggplot2::aes(x = stats::reorder(.data[[group_col]], pct_sig), y = pct_sig)) +
+    ggplot2::geom_col(fill = 'grey35') +
+    ggplot2::coord_flip() +
+    ggplot2::labs(
+      x = label, y = paste0('% of pixels with a significant ', effect_dir, ' effect'),
+      title = paste0('Significant ', effect_dir, ' DART effects, by ', tolower(label))
+    ) +
+    ggplot2::theme_bw() +
+    ggplot2::theme(axis.text = ggplot2::element_text(color = 'black'))
+  
+  pairwise_df <- NULL
+  
+  if (run_pairwise) {
+    
+    if (is.null(baseline)) {
+      baseline <- grp_summary[[group_col]][which.max(grp_summary$n_pix)]
+    }
+    
+    other_levels <- setdiff(unique(df[[group_col]]), baseline)
+    
+    pairwise_list <- lapply(other_levels, function(lvl) {
+      sub_df <- df[df[[group_col]] %in% c(baseline, lvl), ]
+      ft <- stats::fisher.test(table(sub_df[[group_col]], sub_df$.sig_flag))
+      
+      data.frame(
+        level            = lvl,
+        n_pix            = sum(sub_df[[group_col]] == lvl),
+        pct_sig          = round(100 * mean(sub_df$.sig_flag[sub_df[[group_col]] == lvl]), 2),
+        baseline_pct_sig = round(100 * mean(sub_df$.sig_flag[sub_df[[group_col]] == baseline]), 2),
+        p_value          = ft$p.value
+      )
+    })
+    
+    pairwise_df <- do.call(rbind, pairwise_list)
+    pairwise_df$p_adj <- stats::p.adjust(pairwise_df$p_value, method = 'holm')
+    pairwise_df <- pairwise_df[order(pairwise_df$p_adj), ]
+    
+  }
+  
+  return(list(summary = grp_summary, plot = p0, baseline = baseline, pairwise = pairwise_df))
+  
+}
