@@ -92,41 +92,99 @@ plot_all_DART_time <- function(
   return(p0)
   
 }
-plot_all_DART_sig <- function(input_df, obj, ptype = 1, ftype = "") {
-
-    require(dplyr)
-    require(ggplot2)
-
-    fdf <- input_df |>
-      group_by(year_diff, us_l4name, tx_coarse) |>
-      summarise(prop_sig = mean(sig, na.rm = T), .groups = "drop") |>
-      mutate(prop_sig = ifelse(prop_sig == 0, 0.001, prop_sig)) |>
-      mutate(prop_sig = ifelse(prop_sig == 1, 0.999, prop_sig)) |>
-      mutate(prop_sig_char = format(round(prop_sig, 2), nsmall = 2))
-
-    p0 <- fdf |>
-      ggplot(aes(x = year_diff, y = tx_coarse, fill = prop_sig)) +
-      geom_tile() +
-      scale_fill_viridis_c(option = "magma", limits = c(0, 1),name = "Proportion\nsignificant\nDART pixels") +
-      labs(
-        x = "Years since treatment", y = "Treatment",
-        title = paste0("What proportion of treated areas significantly increased ", ftype, "?"),
-        subtitle = paste0("(when objective was ", obj, ")")
-      ) +
-      theme_bw() +
-      theme(axis.text = element_text(color = 'black'), strip.text = element_text(color = 'black'))
-
-    if (ptype == 1) {
-      p0 <- p0 +
-        facet_wrap(~ us_l4name, scales = 'free_y')
-    } else if (ptype == 2) {
-      p0 <- p0 +
-        #geom_text(aes(label = prop_sig_char), size = 2, check_overlap = T) +
-        coord_fixed()
-    } else {
-      stop('bad ptype')
-    }
-
-    return(p0)
-
+plot_all_DART_sig <- function(
+    input_df, obj, ptype = 1, ftype = "",
+    min_n = 30, metric = c("net", "prop_sig"), show_n = FALSE
+) {
+  
+  require(dplyr)
+  require(ggplot2)
+  
+  metric <- match.arg(metric)
+  
+  # ptype 1 facets by ecoregion, so us_l4name stays in the grouping.
+  # ptype 2 is meant to collapse across ecoregion - it must be dropped from the
+  # grouping *before* summarising, not just left out of facet_wrap() afterward,
+  # or every ecoregion's value gets drawn on top of the same tile.
+  group_vars <- if (ptype == 1) {
+    c("year_diff", "us_l4name", "tx_coarse")
+  } else if (ptype == 2) {
+    c("year_diff", "tx_coarse")
+  } else {
+    stop('bad ptype')
   }
+  
+  fdf <- input_df |>
+    group_by(across(all_of(group_vars))) |>
+    summarise(
+      n_pix    = n(),
+      prop_sig = mean(sig, na.rm = TRUE),
+      prop_pos = mean(sig & effect > 0, na.rm = TRUE),
+      prop_neg = mean(sig & effect < 0, na.rm = TRUE),
+      .groups  = "drop"
+    ) |>
+    mutate(
+      # net_sig: -1 = every pixel is significant & negative, +1 = every pixel is
+      # significant & positive, 0 = no signal either way. This is what actually lets
+      # you see whether a hot cell is "successful" or "anti-successful."
+      net_sig     = prop_pos - prop_neg,
+      enough_data = n_pix >= min_n
+    )
+  
+  fill_var  <- if (metric == "net") "net_sig" else "prop_sig"
+  fill_lims <- if (metric == "net") c(-1, 1) else c(0, 1)
+  fill_lab  <- if (metric == "net") {
+    "Net direction of\nsignificant pixels\n(+ = positive, \u2212 = negative)"
+  } else {
+    "Proportion\nsignificant\nDART pixels"
+  }
+  
+  p0 <- fdf |>
+    ggplot(aes(x = year_diff, y = tx_coarse, fill = .data[[fill_var]], alpha = enough_data)) +
+    geom_tile(color = "white", linewidth = 0.2)
+  
+  if (metric == "net") {
+    p0 <- p0 + scale_fill_gradient2(
+      low = "#2166ac", mid = "grey90", high = "#b2182b", midpoint = 0,
+      limits = fill_lims, name = fill_lab
+    )
+  } else {
+    p0 <- p0 + scale_fill_viridis_c(option = "magma", limits = fill_lims, name = fill_lab)
+  }
+  
+  if (show_n) {
+    p0 <- p0 + geom_text(aes(label = n_pix), size = 2, color = "grey20", alpha = 1)
+  }
+  
+  p0 <- p0 +
+    # tiles built on fewer than `min_n` pixels are faded, so a striking color isn't
+    # mistaken for a reliable signal when it's actually driven by a handful of pixels
+    scale_alpha_manual(values = c(`TRUE` = 1, `FALSE` = 0.3), guide = "none") +
+    # break long multi-treatment names (e.g. "seeding;soil disturbance") onto separate
+    # lines instead of letting them run together or get truncated
+    scale_y_discrete(labels = function(x) gsub(';', ';\n', x)) +
+    labs(
+      x = "Years since treatment", y = "Treatment",
+      title = paste0(
+        "Where are treated areas significantly ",
+        if (metric == "net") "shifting" else "increasing", " ", ftype, "?"
+      ),
+      subtitle = paste0(
+        "(when objective was ", obj, ") \u2014 faded tiles have fewer than ", min_n, " pixels"
+      )
+    ) +
+    theme_bw() +
+    theme(
+      axis.text = element_text(color = 'black', size = 7),
+      strip.text = element_text(color = 'black')
+    )
+  
+  if (ptype == 1) {
+    p0 <- p0 + facet_wrap(~ us_l4name)
+  } else {
+    p0 <- p0 + coord_fixed()
+  }
+  
+  return(p0)
+  
+}
