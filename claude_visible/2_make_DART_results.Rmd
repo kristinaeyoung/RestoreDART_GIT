@@ -1,0 +1,727 @@
+---
+title: "RestoreDART initial results summary: sample sizes"
+author: "BEM"
+date: "September 2026"
+output: html_document
+---
+
+## Notes
+
+TODO: move this explanation to the text block starting on line 203 below
+* "positive"/"negative" and "intended"/"unintended" are used herefor two different things, and they are not interchangeable. "Positive effect" and "negative effect" always refer to the raw sign of the (differenced) RAP cover effect itself, independent of any objective - a positive effect means RAP cover went up, a negative effect means it went down. "Intended" and "unintended" always refer to that same raw sign *relative to the assigned objective's management goal*: for a `decrease_*` objective, a negative effect is intended and a positive effect is unintended; for an `increase_*` objective, it's the reverse. So a significant positive effect is a *good* (intended) result under `increase_pfg`, but a *bad* (unintended) result under `decrease_afg` - same raw sign, opposite management meaning. `get_intended_sign()` and `label_intended()` (`helper_functions.R`) encode this mapping in one place so it's applied consistently everywhere this distinction matters (e.g. `reduce_s0()`'s `sig_des`/`sig_und` columns and the summary table's "Intended"/"Unintended" columns below). Sections that compare *raw* positive-effect rates across objectives (e.g. the `summarize_sig_effect()` calls below) are deliberately using the raw, objective-agnostic sign for an apples-to-apples comparison, not the intended/unintended framing.
+
+```{r setup, message = F, warning = F, echo = F}
+
+library(ggplot2)
+source('plot_functions.R')
+source('helper_functions.R')
+
+fig_dir <- '../../results/figures'
+in_fl   <- '../../RestoreDART_DATA/MIXED_MODELS/1_combined_filter_input_data_06192026.csv'
+
+# Read in the combined filter input data and split by objective. Each element of [split_by_objective()]
+# is named as `[direction]_[cover]_[RESPONSE]`, where the combination of direction and cover
+# describes a treatment **objective**, and `RESPONSE` describes the (differenced) RAP cover response variable.
+
+# Keep the raw combined data around (not just the per-objective `summaries` list)
+combined_df <- read.csv(in_fl)
+
+# Objectives dropped from `summaries`:
+#   - "null_afg": not a treatment objective (control/no-op)
+#   - "increase_afg", "increase_tre": out of scope for this round of results
+summaries <- combined_df |>
+  split_by_objective() |>
+  lapply(get_summary_DART_results) |>
+  (\(xx) subset(xx, !grepl('null_afg|^increase_afg_|^increase_tre_', names(xx))))()
+
+summaries_mod <- summaries
+```
+
+## Summary results
+
+---
+
+```{r results-1_0, echo = F}
+# cover: AFG, obj: decrease afg
+r_ind <- 1
+s_0 <- summaries[[r_ind]]
+
+# Sample-size threshold applied to each treatment x ecoregion combination
+min_txeco_n <- 300
+```
+
+### `r print_summary_name(summaries, r_ind, 5)`
+
+#### Pixel counts for each treatment (`'tx_coarse'`)
+
+This table counts the pixels for each treatment for (`r print_summary_name(summaries, r_ind, 5)`).
+
+```{r results-1_1, echo = F}
+# cover: AFG, obj: decrease afg
+knitr::kable(as.data.frame(s_0$tbl_tx), col.names = c("Treatment", "Pixel Count"))
+```
+
+#### Pixel counts by ecoregion (`'us_l4name'`)
+
+```{r results-1_2, echo = F}
+knitr::kable(as.data.frame(s_0$tbl_eco), col.names = c("Ecoregion", "Pixel Count"))
+```
+
+#### Pixel counts for each treatment × ecoregion combination (`'tx_coarse'` x `'us_l4name'`)
+
+Each level of (treatment x ecoregion) is filtered here for low sample size (`r min_txeco_n` pixels).
+
+```{r results-1_3, echo = F, results = 'asis'}
+tbls <- print_tx_eco_trunc_table(character(0), character(0), s_0$tbl_tx_eco, min_txeco_n)
+tbls$full
+tbls$sparse
+```
+
+```{r results-1_4, echo = F}
+tbl_combo <- s_0$tbl_tx_eco
+low_idx   <- which(tbl_combo > 0 & tbl_combo < min_txeco_n, arr.ind = TRUE)
+
+excl_combo <- data.frame(
+  tx_coarse = rownames(tbl_combo)[low_idx[, "row"]],
+  us_l4name = colnames(tbl_combo)[low_idx[, "col"]],
+  stringsAsFactors = FALSE
+)
+
+n_pix_lost_combo <- sum(tbl_combo[low_idx])
+pct_lost_combo   <- round(100 * n_pix_lost_combo / sum(tbl_combo), 2)
+
+# TODO: move this cat(sprintf()) out of the code chunk and into the plain text block below
+cat(sprintf(
+  '\n%d treatment x ecoregion combinations fall below the %d-pixel threshold, representing %.2f%% of the total sample size.\n',
+  nrow(excl_combo), min_txeco_n, pct_lost_combo
+))
+
+knitr::kable(excl_combo, col.names = c("Treatment", "Ecoregion"))
+```
+
+TODO: bold this section, and make sure there is at least one line break between the preceeding and proceeding tables
+
+Are these sparse combinations especially significant (or non-significant)?
+
+
+```{r results-1_5, echo = F}
+col_names <- c("Treatment", "Ecoregion", "Significant Pixels", "Total Pixels", "% Significant Pixels")
+
+pix_sig_TXECO <- s_0$input |>
+  dplyr::group_by(tx_coarse, us_l4name) |>
+  dplyr::summarise(pix_sig = sum(sig), pix_n = dplyr::n(), .groups = 'drop') |>
+  dplyr::mutate(pix_sig_perc = round(100 * (pix_sig / pix_n), 2))
+
+knitr::kable(
+  dplyr::semi_join(pix_sig_TXECO, excl_combo, by = c('tx_coarse', 'us_l4name')),
+  col.names = col_names
+)
+```
+
+#### Results after dropping (treatment x ecoregion) 
+
+The pixel cutoff for each (treatment × ecoregion) combination was `r min_txeco_n`.
+
+```{r results-1_6, echo = F}
+tx_bef  <- unique(s_0$input$tx_coarse)
+eco_bef <- unique(s_0$input$us_l4name)
+
+s0_summary_bef <- reduce_s0(s_0$input)
+n_pix_bef <- sum(s0_summary_bef$grp_n_pix)
+
+trimmed_input <- dplyr::anti_join(s_0$input, excl_combo, by = c('tx_coarse', 'us_l4name'))
+s_0 <- get_summary_DART_results(trimmed_input)
+
+s0_summary_aft <- reduce_s0(s_0$input)
+n_pix_aft <- sum(s0_summary_aft$grp_n_pix)
+
+cat('\nTotal data lost from removing sparse treatment x ecoregion combinations: ', round(((n_pix_bef - n_pix_aft) / n_pix_bef) * 100, 2), ' %\n')
+
+# A treatment or ecoregion can vanish entirely if it only ever appeared in sparse combinations -
+# check for that here, separately from the overall percent lost above.
+dropped_tx  <- setdiff(tx_bef,  unique(s_0$input$tx_coarse))
+dropped_eco <- setdiff(eco_bef, unique(s_0$input$us_l4name))
+
+cat('\nTreatment levels dropped entirely:\n')
+cat(paste0('- ', dropped_tx), sep = '\n')
+
+cat('\nEcoregion levels dropped entirely:\n')
+cat(paste0('- ', dropped_eco), sep = '\n')
+```
+
+Since the filtering above happens at the (treatment x ecoregion) level rather than independently by treatment or by ecoregion, it's worth checking whether any single treatment or ecoregion has been reduced to very few pixels overall as a side effect - if so, it may still be worth dropping that treatment or ecoregion entirely.
+
+```{r results-1_7, echo = F}
+knitr::kable(as.data.frame(table(s_0$input$tx_coarse)), col.names = c("Treatment", "Pixel Count (post-filter)"))
+knitr::kable(as.data.frame(table(s_0$input$us_l4name)), col.names = c("Ecoregion", "Pixel Count (post-filter)"))
+```
+
+No levels of treatment or ecoregion are represented by less than 300 pixels.
+
+TODO: add a code chunk here that creates a table of the treatment x ecoregion pixel counts (post-filter) with columns for coarse objective and cover type. it does not need to be reported. also add a code chunk towards the end of the document that takes this table (and others from other objective/cover combinations) and concatenates it for saving as a .csv
+
+#### Pixel and polygon count histograms, post-filtering
+
+<!-- This is a histogram of the pixel and polygon count table for treatment (`'tx_coarse'`) x ecoregion (`'us_l4name'`). -->
+
+<!-- ```{r results-1_8, echo = F} -->
+<!-- s_0$pixel_plot_0 -->
+<!-- ``` -->
+
+Pixel counts per polygon, excluding zeros, *i.e.* no pixels present for that `'tx_coarse'` x `'us_l4name'` combination):
+
+```{r results-1_9, echo = F}
+s_0$pixel_plot_1
+```
+
+<!-- Each polygon is counted once here, regardless of within-polygon pixel counts. -->
+
+<!-- ```{r results-1_10, echo = F} -->
+<!-- knitr::kable(as.data.frame.matrix(s_0$tbl_poly)) -->
+<!-- ``` -->
+
+Polygon count table, plotted as histogram, zeroes excluded:
+
+```{r results-1_11, echo = F}
+s_0$poly_plot
+```
+
+Polygon count table: for each year since treatment, how many distinct polygons contribute at least one pixel that year.
+
+```{r results-1_12, echo = F}
+# TODO: change this plot so that X axis labels are every 5 years
+s_0$poly_plot_year
+```
+
+TODO: repeat code chunks `results-1_0` to `results-11b` for all of the other levels of `summaries`, i.e. every other (objective x cover type combination). Number the chunks as `results-X_Y`, where X is `r_ind` and Y is an integer sequence starting from 0. Add placeholder text for a human interpretation of the results. When the results are modified by trimming or other code, store the modified summaries in `summaries_mod`.
+
+#### How many pixels have a significant DART result?
+
+DART results are considered significant if the confidence intervals for each DART estimate do not include zero.
+
+Response: **`r print_summary_name(summaries, r_ind, 3)`**
+Objective: **`r print_summary_name(summaries, r_ind, 4)`**
+
+```{r results-1_12, echo = F}
+# TODO: change this into a kable, similiar to section results-1_12b. If it has response and objective in it then remove the redundant text on lines 200/201
+# TODO: generalize this code chunk to all of `summaries`, and report all of the results in one table. add this table to a final code chunk below that writes the results to .csv. instead of pulling the results from `s_0`, use `summaries_mod`.
+cat(sprintf("- **%.1f%%** of pixels show a statistically significant DART result.\n", s_0$pix_sig_TOT[1]))
+cat(sprintf("- **%.1f%%** of all pixels show a significant *positive* effect.\n", s_0$pix_sig_TOT[2]))
+cat(sprintf("- **%.1f%%** of all pixels show a significant *negative* effect.\n", s_0$pix_sig_TOT[3]))
+```
+
+For `decrease_afg`, a negative effect is the *intended* one (see the terminology note above), so of the two bullets above, the "significant negative" share is the intended result and the "significant positive" share is unintended.
+
+TODO: list all of the objective/cover combinations here as a placeholder for a human interpretation of results
+
+To calculate per-polygon SD/SE around these overall percentages we collapse to one % significant per polygon, then take the mean/SD/SE of that per-polygon rate, giving a sense of how variable the overall significance rate is across polygons:
+
+```{r results-1_12b, echo = F}
+# TODO: generalize this code chunk in a similiar way to `results-1_12`
+poly_sig_summary <- summarize_poly_sig(
+  s_0$input,
+  objective_label = print_summary_name(summaries, r_ind, 4),
+  cover_label     = print_summary_name(summaries, r_ind, 3)
+)
+
+# poly_sig_summary is one row, tagged with objective/cover/n_polygons - as more
+# objectives are added to this report, rbind() their summarize_poly_sig() rows
+# onto this same table rather than replacing it, so the table (and the plot
+# below) grows to cover every objective in one place.
+knitr::kable(
+  poly_sig_summary,
+  col.names = c(
+    'Objective', 'Cover', 'N Polygons',
+    'Mean % Sig.', 'SD', 'SE',
+    'Mean % Sig. Positive', 'SD', 'SE',
+    'Mean % Sig. Negative', 'SD', 'SE'
+  ),
+  digits = 2
+)
+```
+
+All three metrics are drawn on one figure below (`metric = 'all'`), dodged within each objective: the overall per-polygon rate alongside its significant-positive and significant-negative components. Since the overall rate is the sum of the two directional rates, having them on the same axis shows directly which direction is responsible for a given objective's overall significance rate.
+
+```{r results-1_12c, echo = F}
+# TODO: generalize this code chunk in a similiar way to `results-1_12` and plot all objective/cover responses on one figure. reduce the offset between metrics if necessary.
+plot_poly_sig_summary(
+  poly_sig_summary, metric = 'all',
+  title    = 'Per-polygon significance summary: overall and by direction',
+  subtitle = print_summary_name(summaries, r_ind, 5)
+)
+```
+
+**Figure.** X axis: objective (with its cover response underneath), one position per row of the per-polygon summary table above. Y axis: the mean, across polygons, of that polygon's percentage of significant pixels, with the vertical range showing ± 1 SE of that mean (the SE column of the table above). Colour: which of the three per-polygon rates is drawn - grey for the overall rate, red for the significant-positive component and blue for the significant-negative component, dodged side by side within each objective so the two directions can be read against the total they sum to. Colours for the two directions are the same ones used in the direction figures further down.
+
+```{r results-1_12d, echo = F}
+# TODO: expand this chunk, and the text below, to all objective/cover types, keeping it concise
+int_effect_decrease_afg_AFG <- summarize_intended_effect(
+  s_0$input,
+  objective_label = gsub(' ', '_', print_summary_name(summaries, r_ind, 4)),
+  cover_label     = print_summary_name(summaries, r_ind, 3)
+)
+```
+
+The overall DART result here is that `r int_effect_decrease_afg_AFG$pct_sig`% of all DART pixels were significant. Treatments produced the intended effect in `r int_effect_decrease_afg_AFG$pct_sig_int`% of treated pixels and an unintended effect in `r int_effect_decrease_afg_AFG$pct_sig_und`% of treated pixels, relative to the assigned objective. I would hypothesize that the very strong unintended-effect result has to do with disturbance effects or the interact effects of compound objectives.
+
+#### How do DART significance patterns change 
+
+```{r results-1_13, echo = F}
+res_obj <- summarize_sig_effect(
+  s_0$input, group_col = 'objective', effect_dir = 'positive',
+  baseline = 'decrease_afg', label = 'Objective'
+)
+
+knitr::kable(
+  res_obj$summary,
+  col.names = c('Objective (Fine)', 'Total Pixels', 'Significant Positive Pixels', '% Significant Positive')
+)
+
+res_obj$plot
+
+# TODO: just remove the pairwise comparisons for this code chunk, it's distracting
+knitr::kable(
+  res_obj$pairwise, digits = 4,
+  col.names = c('Objective', 'N Pixels', '% Sig. Positive', 'Baseline % Sig. Positive', 'Raw p-value', 'Holm-adjusted p-value')
+)
+```
+
+While some complex objectives are significantly different from `decrease_afg` alone, no clear pattern is emergent. 
+
+Repeated for treatment:
+
+```{r results-1_14, echo = F}
+res_tx <- summarize_sig_effect(
+  s_0$input, group_col = 'tx_coarse', effect_dir = 'positive', label = 'Treatment'
+)
+
+knitr::kable(
+  res_tx$summary,
+  col.names = c('Treatment', 'Total Pixels', 'Significant Positive Pixels', '% Significant Positive')
+)
+
+res_tx$plot
+
+# TODO: remove the pairwise comparisons
+knitr::kable(
+  res_tx$pairwise, digits = 4,
+  col.names = c('Treatment', 'N Pixels', '% Sig. Positive', 'Baseline % Sig. Positive', 'Raw p-value', 'Holm-adjusted p-value')
+)
+```
+
+Again, the pattern is not helpful in explaining itself.
+
+Lastly, for ecoregion:
+
+```{r results-1_15, echo = F}
+res_eco <- summarize_sig_effect(
+  s_0$input, group_col = 'us_l4name', effect_dir = 'positive',
+  run_pairwise = FALSE, label = 'Ecoregion'
+)
+
+knitr::kable(
+  res_eco$summary,
+  col.names = c('Ecoregion', 'Total Pixels', 'Significant Positive Pixels', '% Significant Positive')
+)
+
+res_eco$plot
+```
+
+There are too many categories here to make pairwise comparisons helpful. I don't have enough personal knowledge to guess why `Uinta Basin Floor` was so much higher than the other ecoregions.
+
+#### What do the modified results look like graphically?
+
+- The primary spatial dimension of interest is `us_l4name`, while the primary temporal dimension of interest is `year_diff`. The only relevant explanatory variable at this point in the analysis is `tx_coarse`. 
+- Both significant and non-significant pixels should be plotted.
+- Only post-treatment data should be plotted.
+
+```{r results-1_16, echo = F}
+# TODO: there is a "loading required packages" statement printed here that should not be
+plot_all_DART_sig(s_0$input, gsub(' ', '_', print_summary_name(summaries, r_ind, 4)), 1)
+
+eco_list <- sort(unique(s_0$input$us_l4name))
+
+for (i in seq_along(eco_list)) {
+  df_eco <- s_0$input[s_0$input$us_l4name == eco_list[i], ]
+  print(
+    plot_all_DART_time(
+      df_eco,
+      print_summary_name(summaries, r_ind, 3),
+      gsub(' ', '_', print_summary_name(summaries, r_ind, 4)),
+      eco_list[i]
+    )
+  )
+}
+```
+
+For the `decrease_afg` objective, the green bars should generally reflect a negative DART effect (i.e. occur below the zero line). Significant results above the zero line would indicate that the treatment is not working. Red bars neither support nor refute treatment efficacy. 
+
+#### How does time since treatment affect significance?
+
+This section attempts to answer two questions: 
+
+(1) How *often* does a significant effect showed up in a given year? The `% significant` table and the stacked-direction figure immediately below.
+
+(2) How *large* are those effects? The mean-effect table and figure further down. A year can have a handful of significant pixels that each moved a long way, or many pixels that each moved a little, and those are different results.
+
+No weighting is used anywhere in this section. The mean effect per year is a plain arithmetic mean of `effect` over the significant pixels in that year, split by direction of effect, so the reported peak is the year whose significant pixels actually moved furthest rather than a significance-weighted compromise across the whole time series. Some weighting methods were checked and did not improve the results - see `weight_testing_summary.Rmd` for that analysis.
+
+```{r results-1_17, echo = F}
+sig_by_year <- s_0$input |>
+  dplyr::group_by(year_diff) |>
+  dplyr::summarise(
+    n_pix       = dplyr::n(),
+    pct_sig     = round(100 * mean(sig), 2),
+    pct_sig_pos = round(100 * mean(sig & effect > 0), 2),
+    pct_sig_neg = round(100 * mean(sig & effect < 0), 2),
+    .groups = 'drop'
+  ) |>
+  dplyr::arrange(year_diff)
+
+# knitr::kable(
+#   sig_by_year,
+#   col.names = c('Years Since Treatment', 'Total Pixels', '% Significant (any)', '% Significant Positive', '% Significant Negative')
+# )
+
+# Sample-size labels are rotated upright (see plot_sig_direction_stacked()): the
+# group total sits above each bar, and each stacked segment carries its own n -
+# the count of pixels that were significant and positive, and significant and
+# negative, respectively.
+plot_sig_direction_stacked(
+  s_0$input, group_col = 'year_diff', reverse_stack = FALSE,
+  x_lab = 'Years since treatment', x_break_by = 5,
+  title = 'Significant DART effects through time, by direction',
+  subtitle = paste0(print_summary_name(summaries, r_ind, 5), ' (negative = intended)')
+)
+
+# Most and least effective year, pulled out of `sig_by_year` here so that the
+# sentences below can be written as prose with inline R rather than printed as
+# console output.
+year_most  <- sig_by_year$year_diff[which.max(sig_by_year$pct_sig)]
+year_least <- sig_by_year$year_diff[which.min(sig_by_year$pct_sig)]
+pct_most   <- max(sig_by_year$pct_sig)
+pct_least  <- min(sig_by_year$pct_sig)
+```
+
+**Figure.** X axis: years since treatment, one bar per year, labelled every 5 years. Y axis: the percentage of that year's pixels with a significant DART effect - the full height of a bar is the year's overall % significant, and it is a percentage of all pixels observed in that year, not of the significant ones. Fill: the direction of the significant effect, splitting each bar into its blue *significant negative* component (drawn against the axis; the intended direction under `decrease_afg`) and its red *significant positive* component (stacked above it; unintended here). Fill colours mean the same thing in every direction figure in this report. There are no facets or other groupings; the numbers plotted are the last three columns of the table immediately above.
+
+Two different sample sizes are labelled on each bar, and they are **not** meant to sum to each other:
+
+- The rotated label sitting *above* each bar is that year's **group total** - every pixel observed in that year, significant or not. It says how much data is behind the bar, and it is the denominator of the percentage on the Y axis.
+- The white label *inside* each stacked segment is the number of pixels that were significant **and** in that segment's direction. These two are the sample sizes behind the two segment heights themselves.
+
+So the two segment labels add up to the number of *significant* pixels in that year, which is generally far smaller than the group total above the bar, because most pixels in a year are not significant. Reading down a tall bar with a small group total is therefore a different situation from a short bar with a large one, which is exactly why both numbers are drawn. Segments too short to hold their label legibly are left unlabelled to avoid white text spilling onto the panel background; the table above carries the corresponding percentages for every year.
+
+- Treatment was **most** effective (highest % significant pixels) at year `r year_most` (`r sprintf('%.1f', pct_most)`% significant).
+- Treatment was **least** effective (lowest % significant pixels) at year `r year_least` (`r sprintf('%.1f', pct_least)`% significant).
+
+#### How large were the significant effects in each year?
+
+The figure below switches from counting significant pixels to measuring them: among significant pixels only, what was the mean DART effect in each year since treatment, and in which year was that mean largest? Positive and negative effects are summarized separately throughout.
+
+```{r results-1_18b, echo = F}
+effect_by_year <- mean_effect_by_year(s_0$input)
+
+# knitr::kable(
+#   effect_by_year,
+#   col.names = c('Years Since Treatment', 'Direction', 'Significant Pixels', 'Mean Effect', 'SD', 'SE', 'Mean |Effect|'),
+#   digits = 4
+# )
+
+# Peak year per direction. Saved under an object name carrying the objective and
+# cover response (`<objective>_<COVER>`) rather than a bare `peak_effect`, so that
+# each objective's block keeps its own copy and the compilation section near the
+# end of the document can gather them all with collect_obj_tables('peak_effect_').
+peak_effect_decrease_afg_AFG <- peak_effect_year(effect_by_year)
+
+knitr::kable(
+  peak_effect_decrease_afg_AFG,
+  col.names = c('Direction', 'Peak Year', 'Mean Effect at Peak', 'SE', 'Significant Pixels at Peak', 'Last Year Observed', 'Peak Censored?'),
+  digits = 4
+)
+
+# The peak table is handed to the figure rather than recomputed inside it, so the
+# dashed peak-year lines and their labels can never disagree with the table above.
+plot_mean_effect_year(
+  effect_by_year,
+  subtitle    = paste0(print_summary_name(summaries, r_ind, 5), ' (negative = intended)'),
+  peak_effect = peak_effect_decrease_afg_AFG
+)
+
+# Written out as a character vector and emitted below with inline R, so the peak
+# sentences appear as prose rather than as console output.
+peak_bullets <- vapply(seq_len(nrow(peak_effect_decrease_afg_AFG)), function(i) {
+  pk <- peak_effect_decrease_afg_AFG[i, ]
+  sprintf(
+    '- Significant **%s** effects were largest at year %s (mean effect %.4f, SE %.4f, n = %d significant pixels)%s.',
+    pk$direction, pk$peak_year, pk$peak_effect, pk$peak_se, pk$peak_n_pix,
+    ifelse(pk$is_censored, ', which is the last year observed for that direction - the effect may still have been growing past the end of the record', '')
+  )
+}, character(1))
+```
+
+**Figure.** X axis: years since treatment. Y axis: the mean DART effect (Δ RAP cover) among *significant pixels only* in that year, computed separately for each direction - so the two series sit either side of the zero line by construction and are never averaged into a single number. Colour: direction of the effect (red = significant positive, blue = significant negative), using the same colours as the stacked figure above. The shaded band (error cloud) around each line is that year × direction mean ± 1 SE, taken straight from the `SE` column of the first table above: it is sampling uncertainty in the *mean* effect, not the spread of individual pixel effects, so it narrows mainly where a year has many significant pixels. A year × direction cell backed by a single significant pixel has no SE and is drawn as a bare point, keeping the line through it unbroken. Dashed vertical lines mark each direction's peak year from the peak table above, labelled with the mean effect at the peak, its SE, and the number of significant pixels behind it. Non-significant pixels are excluded outright rather than entered as zeros, and no weighting is applied anywhere. There are no facets or other groupings.
+
+`r paste(peak_bullets, collapse = '\n')`
+
+Note that the year with the largest mean effect need not be the year with the most significant pixels: the two questions can peak at different times, and a peak that lands on the last observed year is flagged as censored above for the same reason as in the by-polygon table further down.
+
+```{r results-1_19, echo = F}
+# --- 5/10/15+ year bins for % significant pixels ---
+s_0$input$year_bin <- cut(
+  s_0$input$year_diff,
+  breaks = c(0, 5, 10, 15, Inf),
+  labels = c('1-5', '6-10', '11-15', '16+'),
+  right = TRUE
+)
+
+sig_by_bin <- s_0$input |>
+  dplyr::group_by(year_bin) |>
+  dplyr::summarise(
+    n_pix        = dplyr::n(),
+    mean_pct_sig     = round(100 * mean(sig), 2),
+    mean_pct_sig_pos = round(100 * mean(sig & effect > 0), 2),
+    mean_pct_sig_neg = round(100 * mean(sig & effect < 0), 2),
+    .groups = 'drop'
+  ) |>
+  dplyr::mutate(
+    objective = print_summary_name(summaries, r_ind, 4),
+    cover     = print_summary_name(summaries, r_ind, 3),
+    .before   = 1
+  )
+
+knitr::kable(
+  sig_by_bin,
+  col.names = c('Objective', 'Cover', 'Year Bin', 'Total Pixels', 'Mean % Significant', 'Mean % Significant Positive', 'Mean % Significant Negative')
+)
+```
+
+```{r results-1_20, echo = F}
+# --- By-polygon: which year_diff was each polygon's most/least significant, and
+# is that peak/trough censored (i.e. does it land on the LAST year observed for
+# that polygon, meaning we can't tell if it would have kept climbing/falling)?
+# This is a hard per-polygon peak/trough year - the single year with the highest
+# (or lowest) % significant pixels for that polygon, unweighted and unsmoothed.
+# ---
+poly_year_sig <- s_0$input |>
+  dplyr::group_by(polygon, tx_coarse, us_l4name, year_diff) |>
+  dplyr::summarise(
+    n_pix   = dplyr::n(),
+    pct_sig = 100 * mean(sig),
+    .groups = 'drop'
+  )
+poly_best_worst <- poly_year_sig |>
+  dplyr::group_by(polygon, tx_coarse, us_l4name) |>
+  dplyr::summarise(
+    n_years         = dplyr::n(),
+    year_max        = year_diff[which.max(pct_sig)],
+    year_min        = year_diff[which.min(pct_sig)],
+    is_censored_max = year_max == max(year_diff),
+    is_censored_min = year_min == max(year_diff),
+    .groups = 'drop'
+  )
+
+# Summarize each polygon's "peak significance year" across treatments and ecoregions
+time_summary_by_tx <- poly_best_worst |>
+  dplyr::group_by(tx_coarse) |>
+  dplyr::summarise(
+    n_polygons        = dplyr::n(),
+    mean_year_max     = round(mean(year_max), 2),
+    sd_year_max       = round(sd(year_max), 2),
+    min_year_max      = min(year_max),
+    max_year_max      = max(year_max),
+    pct_censored_max  = round(100 * mean(is_censored_max), 1),
+    .groups = 'drop'
+  )
+
+time_summary_by_eco <- poly_best_worst |>
+  dplyr::group_by(us_l4name) |>
+  dplyr::summarise(
+    n_polygons        = dplyr::n(),
+    mean_year_max     = round(mean(year_max), 2),
+    sd_year_max       = round(sd(year_max), 2),
+    min_year_max      = min(year_max),
+    max_year_max      = max(year_max),
+    pct_censored_max  = round(100 * mean(is_censored_max), 1),
+    .groups = 'drop'
+  )
+
+col_lab_time <- c('Group', 'N Polygons', 'Mean Year of Peak Sig.', 'SD', 'Min', 'Max', '% Censored (peak at last obs. year)')
+
+# The SD of the peak year is undefined (NA) for any treatment or ecoregion backed
+# by a single polygon - there is nothing to vary. Those cells are rendered blank
+# rather than as a literal "NA", which reads as missing data rather than as a
+# quantity that cannot exist. The option is set around these two calls only and
+# restored afterwards, since kable() substitutes at call time.
+old_na <- options(knitr.kable.NA = '')
+knitr::kable(time_summary_by_tx,  col.names = c('Treatment', col_lab_time[-1]))
+knitr::kable(time_summary_by_eco, col.names = c('Ecoregion', col_lab_time[-1]))
+options(old_na)
+```
+
+A polygon's peak (or trough) year is flagged as "censored" when it falls on the last year that polygon was observed - in those cases we can't rule out that significance was still rising (or falling) beyond the end of the available time series. There are implications here for stable-state-change discussion.
+
+#### How often does this objective overlap with other objectives?
+
+The table below shows, among pixels assigned to the current objective, how often each other objective was *also* assigned to that same pixel.
+
+```{r results-1_22, echo = F}
+cur_obj   <- gsub(' ', '_', print_summary_name(summaries, r_ind, 4))
+cur_cover <- print_summary_name(summaries, r_ind, 3)
+
+obj_split <- strsplit(s_0$input$objective, ', ')
+other_obj <- lapply(obj_split, setdiff, y = cur_obj)
+
+n_total     <- length(obj_split)
+n_solo      <- sum(lengths(other_obj) == 0)
+flat_other  <- unlist(other_obj)
+
+# Build with a fixed shape regardless of whether any overlap exists at all, so the
+# kable() call below always gets the column count it expects. `objective` and
+# `cover` (the CURRENT objective/cover, not the co-occurring one) are included so
+# that this table can later be rbind()-ed across objectives into one combined table.
+# The object name carries the objective and cover response
+# (`overlap_tbl_<objective>_<COVER>`) rather than being a bare `overlap_tbl`, for
+# the same reason as `peak_effect_decrease_afg_AFG` above: each objective's block
+# keeps its own copy, and the compilation section below gathers them all with
+# collect_obj_tables('overlap_tbl_').
+overlap_tbl_decrease_afg_AFG <- data.frame(
+  objective = character(0), cover = character(0),
+  co_occurring_objective = character(0), n_pix = integer(0), pct_pix = numeric(0)
+)
+if (length(flat_other) > 0) {
+  tab <- sort(table(flat_other), decreasing = TRUE)
+  overlap_tbl_decrease_afg_AFG <- data.frame(
+    objective = cur_obj,
+    cover     = cur_cover,
+    co_occurring_objective = names(tab),
+    n_pix     = as.integer(tab),
+    pct_pix   = round(100 * as.integer(tab) / n_total, 2),
+    row.names = NULL
+  )
+}
+
+# TODO: rather than a caption, create a row at the top of the data frame that just lists "none" for the co-occuring objective
+knitr::kable(
+  overlap_tbl_decrease_afg_AFG,
+  col.names = c('Objective', 'Cover', 'Co-occurring Objective', 'Pixel Count', '% of Total Pixels'),
+  caption = sprintf(
+    'Of %d total pixels assigned to "%s", %d (%.1f%%) had no other co-occurring objective.',
+    n_total, cur_obj, n_solo, round(100 * n_solo / n_total, 1)
+  )
+)
+```
+
+```{r results_total, echo = F, eval = FALSE}
+
+# When decrease tree is the goal, what do AFG, SHR, and PFG group directions look like?
+res_decrease_tre <- compare_related_directions(combined_df, 'decrease_tre', c('AFG', 'SHR', 'PFG'))
+knitr::kable(res_decrease_tre$table, col.names = c('Cover Response', 'Total Pixels', '% Significant', '% Significant Positive', '% Significant Negative'))
+res_decrease_tre$plot
+
+# When increase PFG is the goal, what does AFG directions look like?
+res_increase_pfg <- compare_related_directions(combined_df, 'increase_pfg', c('AFG'))
+knitr::kable(res_increase_pfg$table, col.names = c('Cover Response', 'Total Pixels', '% Significant', '% Significant Positive', '% Significant Negative'))
+res_increase_pfg$plot
+
+# When decrease SHB was the goal, what does AFG, PFG, TRE directions look like?
+res_decrease_shb <- compare_related_directions(combined_df, 'decrease_shb', c('AFG', 'PFG', 'TRE'))
+knitr::kable(res_decrease_shb$table, col.names = c('Cover Response', 'Total Pixels', '% Significant', '% Significant Positive', '% Significant Negative'))
+res_decrease_shb$plot
+```
+
+#### Compiled tables across objectives
+
+Each table below gathers the per-objective tables into one table.
+
+```{r compile_tables, echo = F}
+peak_effect_all  <- collect_obj_tables('peak_effect_')
+overlap_tbl_all  <- collect_obj_tables('overlap_tbl_')
+int_effect_all   <- collect_obj_tables('int_effect_')
+
+# Each kable is left to auto-print (rather than wrapped in print() or a
+# conditional), so knitr dispatches knit_print.knitr_kable and renders a real
+# table instead of dumping the raw pipe-table text - the same reason
+# print_tx_eco_trunc_table() returns its kables instead of printing them.
+knitr::kable(
+  int_effect_all,
+  col.names = c('Objective', 'Cover', 'Total Pixels', '% Significant', '% Significant (Intended)', '% Significant (Unintended)'),
+  caption = 'Overall significance rate per objective x cover response, split into intended and unintended shares of all pixels (see summarize_intended_effect()). The intended and unintended columns sum to the overall rate, up to rounding.',
+  digits = 2
+)
+
+knitr::kable(
+  peak_effect_all,
+  col.names = c('Objective (Cover)', 'Direction', 'Peak Year', 'Mean Effect at Peak', 'SE', 'Significant Pixels at Peak', 'Last Year Observed', 'Peak Censored?'),
+  caption = 'Year of largest mean DART effect, one row per objective x cover response x direction. A censored peak lands on the last year observed for that direction, so the effect may still have been growing past the end of the record.',
+  digits = 4
+)
+
+knitr::kable(
+  overlap_tbl_all,
+  col.names = c('Objective', 'Cover', 'Co-occurring Objective', 'Pixel Count', '% of Total Pixels'),
+  caption = 'Objective co-occurrence, one row per objective x co-occurring objective. Percentages are of the pixels used in that objective\'s own (filtered) analysis, not of the full combined dataset.',
+  digits = 2
+)
+```
+
+#### Summary table
+
+```{r summary_table, echo = F}
+# "% or # of time this was the objective": out of all polygons across every element
+# of `summaries` (i.e. every objective x cover-response combination currently being
+# examined), what share belonged to this objective? Each list element's name is
+# "<objective>_<FUN_GROUP>", where FUN_GROUP is just the uppercased tail of the
+# objective itself (see split_by_objective()), so we strip that back off to get the
+# objective on its own before tallying.
+
+poly_by_elem   <- sapply(summaries, function(x) length(unique(x$input$polygon)))
+obj_of_elem    <- sub('_[A-Z]+$', '', names(summaries))
+poly_by_obj    <- tapply(poly_by_elem, obj_of_elem, sum)
+total_poly_all <- sum(poly_by_elem)
+
+cur_obj      <- gsub(' ', '_', print_summary_name(summaries, r_ind, 4))
+n_time_obj   <- unname(poly_by_obj[cur_obj])
+pct_time_obj <- round(100 * n_time_obj / total_poly_all, 2)
+
+# "# / % of time this was the treatment": within THIS objective's own data
+# (s_0$input, already filtered to decrease_afg/AFG and post sparse-combo drops),
+# how many of the objective's n_time_obj polygons received each treatment,
+# across all ecoregions? This is deliberately a percentage of n_time_obj (the
+# objective's own polygon count), not of total_poly_all (every objective's
+# polygons combined) - a polygon that received more than one treatment across
+# its pixels will be counted under more than one treatment, so these percentages
+# are not expected to sum to 100.
+poly_by_tx <- s_0$input |>
+  dplyr::group_by(tx_coarse) |>
+  dplyr::summarise(n_time_treatment = length(unique(polygon)), .groups = 'drop') |>
+  dplyr::mutate(pct_time_treatment = round(100 * n_time_treatment / n_time_obj, 2))
+
+summary_table <- s0_summary_aft |>
+  dplyr::left_join(poly_by_tx, by = 'tx_coarse') |>
+  dplyr::mutate(
+    n_time_objective   = n_time_obj,
+    pct_time_objective = pct_time_obj
+  ) |>
+  dplyr::select(
+    n_time_objective, pct_time_objective,
+    objective, fun_group, tx_coarse, n_time_treatment, pct_time_treatment, us_l4name,
+    grp_n_pix, grp_n_poly, grp_n_sig, grp_n_sig_int, grp_n_sig_uni, grp_perc_int, grp_perc_uni
+  )
+
+knitr::kable(
+  summary_table,
+  col.names = c(
+    '# Times This Was Objective', '% of Time This Was Objective',
+    'Objective', 'Cover Response', 'Treatment Method',
+    '# Times This Was Treatment', '% of Time This Was Treatment',
+    'Ecoregion',
+    'Total Pixels', 'Number Polygons', '# Significant Pixels',
+    '# Significant Pixels (Intended)', '# Significant Pixels (Unintended)',
+    '% Significant Pixels (Intended)', '% Significant Pixels (Unintended)'
+  ),
+  digits = 2
+)
+```
+
+This table is drafted for the `decrease_afg` objective only; it can be expanded to the other objectives once they're added to this report.
