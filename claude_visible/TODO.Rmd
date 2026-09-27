@@ -249,6 +249,27 @@ that timing given the available sample.
   `results-1_4` and `results-1_6`), which is cross-sectional and does nothing about
   sparsely supported late years. A year-based or polygon-count-based threshold would
   attach to `sig_by_year` (lines 352-366) and to the per-year figures.*
+
+  *Evidence, September 2026, from the first run of the pipeline against the full input
+  file (9,094,508 rows): for `decrease_afg` / AFG, `peak_effect_year()` reports the peak
+  **positive** effect as +28.78 (SE 3.53) at year 25, computed from **10 significant
+  pixels**, and the peak **negative** effect as -43.26 (SE 1.79) at year 18 from 132.
+  Significant-pixel counts for that objective fall from 2,025 positive / 616 negative in
+  year 1 to 10 / 15 by year 25. Both dashed peak lines drawn by
+  `plot_mean_effect_year()` therefore sit in the part of the series where n is in the
+  tens, and the jagged tail beyond roughly year 18 is small-n scatter presented with the
+  same visual weight as the well-supported early years. The `is_censored` flag does not
+  catch this: it fires only when the peak falls on the last observed year, not when it
+  falls on a sparse interior one. Note also that the precedent for a small-n guard
+  already exists elsewhere in the report - the year x treatment x ecoregion heatmap fades
+  tiles built on fewer than 30 pixels (`_objective_block.Rmd`, figure note at line 346) -
+  but `mean_effect_by_year()`, `peak_effect_year()` and the mean-effect figure have no
+  equivalent. The narrowest fix that would change the reported numbers is a minimum
+  significant-pixel count per year x direction cell (n = 100 would truncate this
+  objective at about year 18), applied inside `mean_effect_by_year()` so that the peak
+  table, the peak lines and the figure cannot disagree, with the dropped years still
+  reported somewhere so the truncation is visible rather than silent. Whether the
+  threshold should be a pixel count, a polygon count, or both is the open question.*
 - ~~**Add time sample size tables to the `.Rmd`.** Specifically, are sample sizes in the
   later years being reduced, and is that reduction affecting the results
   disproportionately? These tables are the evidence base for the cut-off decision

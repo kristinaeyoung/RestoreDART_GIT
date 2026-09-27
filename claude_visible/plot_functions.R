@@ -146,7 +146,10 @@ plot_sig_direction_stacked <- function(
   return(p0)
 
 }
-plot_poly_sig_summary <- function(tbl, metric = c('all', 'overall', 'positive', 'negative'), title = NULL, subtitle = NULL) {
+plot_poly_sig_summary <- function(
+    tbl, metric = c('all', 'overall', 'positive', 'negative'),
+    title = NULL, subtitle = NULL, dodge_width = 0.25
+) {
   # Takes the expandable per-objective/cover summary table built by
   # summarize_poly_sig() (helper_functions.R) - one row per objective/cover
   # combination, with mean/SD/SE of % significant pixels taken across polygons -
@@ -167,6 +170,14 @@ plot_poly_sig_summary <- function(tbl, metric = c('all', 'overall', 'positive', 
   # `metric` drawn. Once the table carries more than one objective the caller
   # usually wants to say which objective(s) the figure covers, which this
   # function has no way to know; pass it in rather than editing the default.
+  #
+  # `dodge_width` is the horizontal offset between the three metrics within one
+  # objective. It is deliberately smaller than the ggplot default: with every
+  # objective x cover response on one figure, each objective gets a narrower slot
+  # on the x-axis, and a wide dodge pushes a metric far enough off its own
+  # objective's tick to be read against the neighbouring one. Keeping the three
+  # points visibly clustered is what makes the decomposition (overall = positive
+  # + negative) readable across many objectives.
 
   require(ggplot2)
 
@@ -202,7 +213,7 @@ plot_poly_sig_summary <- function(tbl, metric = c('all', 'overall', 'positive', 
     ggplot(aes(x = .label, y = .mean, colour = .metric)) +
     geom_pointrange(
       aes(ymin = .mean - .se, ymax = .mean + .se),
-      size = 0.6, position = position_dodge(width = 0.4)
+      size = 0.6, position = position_dodge(width = dodge_width)
     ) +
     scale_colour_manual(values = setNames(unname(metric_pal), unname(metric_lab)), name = 'Metric') +
     labs(
@@ -216,6 +227,13 @@ plot_poly_sig_summary <- function(tbl, metric = c('all', 'overall', 'positive', 
   # A single-metric call has nothing to distinguish, so the legend is dropped and
   # the figure looks as it did before 'all' existed.
   if (metric != 'all') p0 <- p0 + guides(colour = 'none')
+
+  # Two-line "objective\n(cover)" labels run into each other once there are more
+  # than a handful of objectives on the axis, so they are tilted at that point
+  # only - a single-objective figure keeps its horizontal label.
+  if (nrow(tbl) > 4) {
+    p0 <- p0 + theme(axis.text.x = element_text(angle = 45, hjust = 1, color = 'black'))
+  }
 
   return(p0)
 

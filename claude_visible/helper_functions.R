@@ -25,6 +25,126 @@ label_intended <- function(sig, effect, objective) {
   intended_sign <- get_intended_sign(objective)
   ifelse(!sig, 'not significant', ifelse(sign(effect) == intended_sign, 'intended', 'unintended'))
 }
+intended_dir_word <- function(objective) {
+  # The raw-sign word ("positive" / "negative") that counts as the INTENDED
+  # outcome for `objective`, derived from get_intended_sign() so it can never
+  # disagree with the per-pixel labelling. Used by the report text and figure
+  # subtitles, which have to name the intended direction in words rather than as
+  # a sign, and by plot_sig_direction_stacked()'s `reverse_stack` argument (the
+  # intended direction is the one drawn against the x-axis).
+  ifelse(get_intended_sign(objective) > 0, 'positive', 'negative')
+}
+unintended_dir_word <- function(objective) {
+  # Complement of intended_dir_word(), kept as its own helper so the report text
+  # never has to hard-code the pairing.
+  ifelse(get_intended_sign(objective) > 0, 'negative', 'positive')
+}
+fmt_level_list <- function(x, none_text = 'none') {
+  # Formats a character vector of factor levels for inline R in the report:
+  # backticked and comma-separated, or `none_text` when the vector is empty.
+  # Replaces the earlier cat(paste0('- ', x), sep = '\n') pattern, which emitted
+  # a bare heading with nothing under it whenever nothing had been dropped.
+  if (!length(x)) return(none_text)
+  paste0('`', x, '`', collapse = ', ')
+}
+txeco_threshold <- function(elem_name, thresholds) {
+  # Resolves the (treatment x ecoregion) minimum-pixel threshold to use for one
+  # element of `summaries`, allowing the threshold to differ by objective x cover
+  # response instead of being one number for the whole report.
+  #
+  # `thresholds` is a named numeric vector whose names are either full element
+  # names of `summaries` ("<objective>_<COVER>", e.g. "decrease_afg_AFG") or bare
+  # objectives ("decrease_afg"); the two are interchangeable in practice, since
+  # split_by_objective() pairs each objective with exactly one cover response.
+  # A `default` entry is required and is used for any element not named
+  # explicitly, so adding an override is a one-line edit to the setup chunk and
+  # leaves every other objective alone.
+  #
+  # Lookup is most-specific-first (full element name, then bare objective, then
+  # `default`) so that naming an objective explicitly always wins over the
+  # fallback, whichever form it was named in.
+
+  stopifnot(is.numeric(thresholds), !is.null(names(thresholds)))
+  if (!('default' %in% names(thresholds))) {
+    stop('txeco_threshold(): `thresholds` must include a "default" entry')
+  }
+
+  bare_obj <- sub('_[A-Z]+$', '', elem_name)
+
+  for (key in c(elem_name, bare_obj, 'default')) {
+    if (key %in% names(thresholds)) return(unname(thresholds[[key]]))
+  }
+}
+summarize_sig_overall <- function(df_in, objective_label, cover_label, col_sig = 'sig', col_effect = 'effect') {
+  # Overall pixel-level significance rate for one objective x cover response,
+  # split by the RAW sign of the effect (positive / negative), i.e. the three
+  # numbers that get_summary_DART_results() returns as `pix_sig_TOT`. This is the
+  # objective-agnostic companion to summarize_intended_effect(), which splits the
+  # same total into intended / unintended shares instead.
+  #
+  # Returns ONE ROW tagged with objective/cover, for the same reason as the other
+  # summarize_*() helpers here: the row can be rendered on its own inside an
+  # objective's section and also rbind()-ed across objectives (via
+  # collect_obj_tables('sig_overall_')) into one cross-objective table. Carrying
+  # the objective and cover in the table itself is what let the report drop the
+  # free-standing "Response: / Objective:" lines that used to label these numbers.
+
+  n_tot <- nrow(df_in)
+
+  data.frame(
+    objective   = objective_label,
+    cover       = cover_label,
+    n_pix       = n_tot,
+    pct_sig     = round(100 * mean(df_in[[col_sig]]), 1),
+    pct_sig_pos = round(100 * mean(df_in[[col_sig]] & df_in[[col_effect]] > 0), 1),
+    pct_sig_neg = round(100 * mean(df_in[[col_sig]] & df_in[[col_effect]] < 0), 1),
+    stringsAsFactors = FALSE
+  )
+}
+objective_overlap_table <- function(df_in, objective_label, cover_label, obj_col = 'objective', sep = ', ') {
+  # Objective co-occurrence for one objective x cover response: among pixels
+  # assigned to `objective_label`, how often was each OTHER objective also
+  # assigned to the same pixel?
+  #
+  # The pixels with no other objective at all are carried as an explicit first
+  # row labelled "none" rather than being relegated to a table caption, so that
+  # (a) the solo share is read off the same column as every co-occurring share,
+  # and (b) the row survives rbind()-ing across objectives into the compiled
+  # table, which a caption could not.
+  #
+  # Percentages are shares of all pixels in `df_in` (i.e. of that objective's own
+  # filtered analysis set), so the "none" row plus the co-occurrence rows sum to
+  # more than 100% whenever pixels carry more than two objectives.
+
+  obj_split  <- strsplit(df_in[[obj_col]], sep)
+  other_obj  <- lapply(obj_split, setdiff, y = objective_label)
+  n_total    <- length(obj_split)
+  n_solo     <- sum(lengths(other_obj) == 0)
+  flat_other <- unlist(other_obj)
+
+  out <- data.frame(
+    objective = objective_label,
+    cover     = cover_label,
+    co_occurring_objective = 'none',
+    n_pix     = as.integer(n_solo),
+    pct_pix   = round(100 * n_solo / n_total, 2),
+    stringsAsFactors = FALSE
+  )
+
+  if (length(flat_other) > 0) {
+    tab <- sort(table(flat_other), decreasing = TRUE)
+    out <- rbind(out, data.frame(
+      objective = objective_label,
+      cover     = cover_label,
+      co_occurring_objective = names(tab),
+      n_pix     = as.integer(tab),
+      pct_pix   = round(100 * as.integer(tab) / n_total, 2),
+      stringsAsFactors = FALSE
+    ))
+  }
+
+  return(`rownames<-`(out, NULL))
+}
 se <- function(x) {
   # Standard error of the mean. Pulled out as a named helper (rather than left
   # inline in a single .Rmd chunk) so any chunk that summarizes a sample-level
@@ -258,7 +378,8 @@ get_summary_DART_results <- function(
     col_eco      = "us_l4name",
     col_sig      = "sig",
     col_effect   = "effect",
-    bins         = 60
+    bins         = 60,
+    poly_year_break_by = 5
 ) {
   
   require(dplyr)
@@ -315,8 +436,23 @@ get_summary_DART_results <- function(
   df_poly_year <- df_poly_year[!duplicated(df_poly_year), ]
   tbl_poly_year <- table(df_poly_year$year_diff)
 
-  poly_plot_year <- ggplot(as.data.frame(tbl_poly_year), aes(x = as.integer(as.character(Var1)), y = Freq)) +
+  # Breaks are set every `poly_year_break_by` years rather than left to ggplot's
+  # default spacing, which over a ~30-year record labels only every tenth year
+  # and makes it hard to read a specific year off the axis. The first break is
+  # the first multiple of the interval at or above the earliest year observed, so
+  # no label is drawn outside the range of the data (same rule as
+  # plot_sig_direction_stacked()'s `x_break_by`).
+  poly_year_df <- as.data.frame(tbl_poly_year)
+  poly_year_x  <- as.integer(as.character(poly_year_df$Var1))
+
+  poly_plot_year <- ggplot(poly_year_df, aes(x = as.integer(as.character(Var1)), y = Freq)) +
     geom_col(fill = "grey35", colour = "white", linewidth = 0.3) +
+    scale_x_continuous(
+      breaks = seq(
+        ceiling(min(poly_year_x) / poly_year_break_by) * poly_year_break_by,
+        max(poly_year_x), by = poly_year_break_by
+      )
+    ) +
     labs(x = "Years since treatment", y = "Number of polygons", title = "Polygon count by year since treatment") +
     theme_bw() +
     theme(axis.text = element_text(color = 'black'))
