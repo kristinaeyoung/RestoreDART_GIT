@@ -42,6 +42,12 @@ uni_word <- unintended_dir_word(cur_obj)
 # silently inherit it.
 min_txeco_n_i <- txeco_threshold(obj_nm, min_txeco_n)
 
+# The minimum per-year sample size for THIS objective x cover response, resolved
+# from `min_year_n` the same way and for the same reason (see year_threshold()).
+# Below it, that year and every year after it are dropped - see
+# truncate_late_years() and the trimming chunk below.
+min_year_n_i <- year_threshold(obj_nm, min_year_n)
+
 s_0 <- summaries[[r_ind]]
 ```
 
@@ -137,6 +143,34 @@ if (nrow(trimmed_input) == 0) {
   ))
 }
 
+# Second filter: whole treatment or ecoregion levels left below the same
+# threshold once their sparse cells are gone. The cell-level filter above works
+# on (treatment x ecoregion) combinations and so cannot see a level that has
+# been thinned across many surviving cells rather than emptied out of any one of
+# them. Controlled by `drop_depopulated` in the parent's setup chunk, because
+# whether a thinned level should be analysed at reduced power or removed is a
+# judgement rather than a fact about the data.
+if (drop_depopulated) {
+  trimmed_input <- drop_depopulated_levels(trimmed_input, min_txeco_n_i)
+  depop <- attr(trimmed_input, 'levels_dropped')
+} else {
+  depop <- list(tx_coarse = character(0), us_l4name = character(0))
+}
+
+# Third filter: the late-year tail. Everything above is cross-sectional - it
+# says nothing about the per-year sample size, which falls monotonically as
+# polygons drop out of the post-treatment record. This truncates the series at
+# the first year that cannot support a comparison and drops everything after it.
+# It happens LAST so that the per-year counts it tests are the ones the figures
+# will actually be drawn from, after both spatial filters.
+trimmed_input <- truncate_late_years(
+  trimmed_input, min_year_n_i, metric = year_trunc_metric
+)
+year_trunc <- attr(trimmed_input, 'year_trunc')
+
+# get_summary_DART_results() rebuilds its histograms and tables from whatever it
+# is given, so the attributes carried by the trimmed frame are not needed past
+# this point - they have been copied into `depop` and `year_trunc` above.
 s_0 <- get_summary_DART_results(trimmed_input)
 
 s0_summary_aft <- reduce_s0(s_0$input)
@@ -161,11 +195,28 @@ dropped_eco <- setdiff(eco_bef, unique(s_0$input$us_l4name))
 # objective (see the parent's setup chunk): with unequal thresholds, a compiled
 # cross-objective table is comparing unequally filtered samples, and this is the
 # table that makes that visible rather than leaving it in the setup chunk.
+# `pct_pix_lost` is the TOTAL loss across all three filters, not the cell filter
+# alone: it compares reduce_s0() before any filtering against reduce_s0() after
+# all of it. The per-filter detail is in the columns either side of it -
+# n_combo_excluded for the cell filter, n_tx_depop / n_eco_depop for the
+# depopulated-level drop, and n_year_dropped for the truncation.
+#
+# n_tx_dropped / n_eco_dropped are a different quantity from n_tx_depop /
+# n_eco_depop: the first pair counts levels ABSENT from the post-filter data for
+# any reason (including having only ever appeared in sparse cells), the second
+# counts levels removed deliberately by drop_depopulated_levels(). With
+# `drop_depopulated = FALSE` the second pair is 0 and the first can still be
+# non-zero.
 assign(paste0('filter_log_', obj_nm), data.frame(
   objective        = cur_obj,
   cover            = cur_cover,
   min_txeco_n      = min_txeco_n_i,
   n_combo_excluded = n_excl_combo,
+  n_tx_depop       = length(depop$tx_coarse),
+  n_eco_depop      = length(depop$us_l4name),
+  min_year_n       = min_year_n_i,
+  year_trunc_at    = year_trunc$trunc_at,
+  n_year_dropped   = year_trunc$n_dropped,
   pct_pix_lost     = pct_lost_trim,
   n_tx_dropped     = length(dropped_tx),
   n_eco_dropped    = length(dropped_eco),
@@ -173,9 +224,15 @@ assign(paste0('filter_log_', obj_nm), data.frame(
 ))
 ```
 
-Total data lost from removing sparse treatment x ecoregion combinations: **`r sprintf('%.2f', pct_lost_trim)`%**. Treatment levels dropped entirely: `r fmt_level_list(dropped_tx)`. Ecoregion levels dropped entirely: `r fmt_level_list(dropped_eco)`.
+Three filters have now been applied to this objective x cover response, in this order, and the percentage below is the combined cost of all three:
 
-Since the filtering above happens at the (treatment x ecoregion) level rather than independently by treatment or by ecoregion, it's worth checking whether any single treatment or ecoregion has been reduced to very few pixels overall as a side effect - if so, it may still be worth dropping that treatment or ecoregion entirely.
+1. **Sparse (treatment x ecoregion) cells** - the `r n_excl_combo` combinations listed above, below `r min_txeco_n_i` pixels each.
+2. **Depopulated treatment or ecoregion levels** - `r if (drop_depopulated) paste0('on, at the same ', min_txeco_n_i, '-pixel threshold: ', length(depop$tx_coarse), ' treatment and ', length(depop$us_l4name), ' ecoregion level(s) removed') else 'off (drop_depopulated = FALSE), so no level was removed on this ground'`. This catches a level thinned across many surviving cells, which the cell filter cannot see.
+3. **Late-year truncation** - `r if (is.na(year_trunc$trunc_at)) paste0('no year fell below ', min_year_n_i, ' ', year_trunc$metric, ' pixels, so the series was not truncated') else paste0('year ', year_trunc$trunc_at, ' was the first below ', min_year_n_i, ' ', year_trunc$metric, ' pixels, so it and the ', year_trunc$n_dropped - 1, ' year(s) after it were dropped; the series now ends at year ', year_trunc$last_kept)`.
+
+Total data lost across all three: **`r sprintf('%.2f', pct_lost_trim)`%**. Treatment levels absent from the post-filter data: `r fmt_level_list(dropped_tx)`. Ecoregion levels absent: `r fmt_level_list(dropped_eco)`. (These are levels gone for *any* reason - a level that only ever appeared in sparse cells disappears without the depopulation filter being involved.)
+
+The post-filter totals below are the check that the three filters together have not left some treatment or ecoregion analysable in name only.
 
 ```{r results-{{r_ind}}_7, echo = F}
 tx_post_n  <- table(s_0$input$tx_coarse)
@@ -273,56 +330,66 @@ The same total expressed as intended versus unintended rather than as raw sign: 
 # of the three groupings below (objective, treatment, ecoregion): with this many
 # levels the Fisher tests were a distraction from the descriptive pattern, so
 # `run_pairwise = FALSE` everywhere and the pairwise tables are gone.
+#
+# All three now report the INTENDED effect rather than the raw positive one.
+# These figures sit inside a single objective's section, where every level on
+# the axis shares that objective's management goal, so the intended sign is the
+# meaningful one - and titling them "significant positive effects" invited
+# reading a `decrease_*` objective's failures as successes. `effect_dir =
+# 'intended'` needs the objective, from which get_intended_sign() derives the
+# sign; nothing here hard-codes it. The cross-objective tables in the
+# compilation section still use the raw sign, which is correct there because
+# rows from different objectives are read against each other.
 res_obj <- summarize_sig_effect(
-  s_0$input, group_col = 'objective', effect_dir = 'positive',
-  run_pairwise = FALSE, label = 'Objective'
+  s_0$input, group_col = 'objective', effect_dir = 'intended',
+  objective = cur_obj, run_pairwise = FALSE, label = 'Objective'
 )
 
 knitr::kable(
   res_obj$summary,
-  col.names = c('Objective (Fine)', 'Total Pixels', 'Significant Positive Pixels', '% Significant Positive')
+  col.names = c('Objective (Fine)', 'Total Pixels', 'Significant Intended Pixels', '% Significant Intended')
 )
 
 res_obj$plot
 ```
 
-**Table and figure.** One row (and one bar) per *fine* objective string - the full comma-separated objective assignment of a pixel, so a pixel with compound objectives appears under its own combination rather than under each part. X axis of the figure: the percentage of that objective's pixels with a significant *positive* effect (raw sign, objective-agnostic, for comparability across objectives). Y axis: the fine objective, ordered by that percentage. Bars are a single grey fill; no colour grouping or facets. Across the `r nrow(res_obj$summary)` fine objectives present, the rate ranges from `r sprintf('%.2f', min(res_obj$summary$pct_sig))`% to `r sprintf('%.2f', max(res_obj$summary$pct_sig))`%.
+**Table and figure.** One row (and one bar) per *fine* objective string - the full comma-separated objective assignment of a pixel, so a pixel with compound objectives appears under its own combination rather than under each part. X axis of the figure: the percentage of that objective's pixels with a significant *intended* effect - i.e. significant and in the direction `r cur_obj` was aiming for, which for this objective is a `r int_word` effect. Y axis: the fine objective, ordered by that percentage. Bars are a single grey fill; no colour grouping or facets. Across the `r nrow(res_obj$summary)` fine objectives present, the rate ranges from `r sprintf('%.2f', min(res_obj$summary$pct_sig))`% to `r sprintf('%.2f', max(res_obj$summary$pct_sig))`%. Because the sign is taken relative to this objective's goal, these percentages are comparable *within* this section but not against another objective's version of the same figure - the cross-objective tables at the end of the report use the raw sign for that reason.
 
 Repeated for treatment:
 
 ```{r results-{{r_ind}}_15, echo = F}
 res_tx <- summarize_sig_effect(
-  s_0$input, group_col = 'tx_coarse', effect_dir = 'positive',
-  run_pairwise = FALSE, label = 'Treatment'
+  s_0$input, group_col = 'tx_coarse', effect_dir = 'intended',
+  objective = cur_obj, run_pairwise = FALSE, label = 'Treatment'
 )
 
 knitr::kable(
   res_tx$summary,
-  col.names = c('Treatment', 'Total Pixels', 'Significant Positive Pixels', '% Significant Positive')
+  col.names = c('Treatment', 'Total Pixels', 'Significant Intended Pixels', '% Significant Intended')
 )
 
 res_tx$plot
 ```
 
-**Table and figure.** As above, grouped by coarse treatment (`'tx_coarse'`). X axis: % of that treatment's pixels with a significant positive effect. Y axis: treatment, ordered by that percentage. Single grey fill, no facets. Range across the `r nrow(res_tx$summary)` treatments: `r sprintf('%.2f', min(res_tx$summary$pct_sig))`% to `r sprintf('%.2f', max(res_tx$summary$pct_sig))`%.
+**Table and figure.** As above, grouped by coarse treatment (`'tx_coarse'`). X axis: % of that treatment's pixels with a significant *intended* (`r int_word`) effect. Y axis: treatment, ordered by that percentage. Single grey fill, no facets. Range across the `r nrow(res_tx$summary)` treatments: `r sprintf('%.2f', min(res_tx$summary$pct_sig))`% to `r sprintf('%.2f', max(res_tx$summary$pct_sig))`%. This is the closest thing in the report to a per-treatment success rate for this objective, since the direction counted is the one the treatment was trying to produce.
 
 Lastly, for ecoregion:
 
 ```{r results-{{r_ind}}_16, echo = F}
 res_eco <- summarize_sig_effect(
-  s_0$input, group_col = 'us_l4name', effect_dir = 'positive',
-  run_pairwise = FALSE, label = 'Ecoregion'
+  s_0$input, group_col = 'us_l4name', effect_dir = 'intended',
+  objective = cur_obj, run_pairwise = FALSE, label = 'Ecoregion'
 )
 
 knitr::kable(
   res_eco$summary,
-  col.names = c('Ecoregion', 'Total Pixels', 'Significant Positive Pixels', '% Significant Positive')
+  col.names = c('Ecoregion', 'Total Pixels', 'Significant Intended Pixels', '% Significant Intended')
 )
 
 res_eco$plot
 ```
 
-**Table and figure.** As above, grouped by level-IV ecoregion (`'us_l4name'`). X axis: % of that ecoregion's pixels with a significant positive effect. Y axis: ecoregion, ordered by that percentage. Single grey fill, no facets. Range across the `r nrow(res_eco$summary)` ecoregions: `r sprintf('%.2f', min(res_eco$summary$pct_sig))`% to `r sprintf('%.2f', max(res_eco$summary$pct_sig))`%.
+**Table and figure.** As above, grouped by level-IV ecoregion (`'us_l4name'`). X axis: % of that ecoregion's pixels with a significant *intended* (`r int_word`) effect. Y axis: ecoregion, ordered by that percentage. Single grey fill, no facets. Range across the `r nrow(res_eco$summary)` ecoregions: `r sprintf('%.2f', min(res_eco$summary$pct_sig))`% to `r sprintf('%.2f', max(res_eco$summary$pct_sig))`%.
 
 #### What do the modified results look like graphically?
 
@@ -330,9 +397,9 @@ res_eco$plot
 - Both significant and non-significant pixels should be plotted.
 - Only post-treatment data should be plotted.
 
-```{r results-{{r_ind}}_17, echo = F}
-plot_all_DART_sig(s_0$input, cur_obj, 1)
+The year x treatment x ecoregion heatmap that used to open this subsection (`plot_all_DART_sig()`, "Where are treated areas significantly shifting?") has been removed. It carried the net direction of significant pixels as a diverging fill over a year x treatment grid, faceted by ecoregion, with cells under 30 pixels faded; with five objectives and up to 28 ecoregions each it was one dense panel grid per objective and the bar panels below say the same thing on axes that can be read off directly. The function is still in `plot_functions.R` and takes `metric = 'prop_sig'` as well as the default net-direction fill, so the figure can be brought back by restoring the one call at the top of the chunk below.
 
+```{r results-{{r_ind}}_17, echo = F}
 eco_list <- sort(unique(s_0$input$us_l4name))
 
 for (i in seq_along(eco_list)) {
@@ -342,8 +409,6 @@ for (i in seq_along(eco_list)) {
   )
 }
 ```
-
-**Figure (heatmap).** X axis: years since treatment. Y axis: coarse treatment. Fill: the net direction of significant pixels in that year x treatment x ecoregion cell, from -1 (every pixel significant and negative, blue) through 0 (no net signal, grey) to +1 (every pixel significant and positive, red). Facets: level-IV ecoregion, one panel each. Tiles built on fewer than 30 pixels are drawn faded so a strong colour from a handful of pixels is not mistaken for a reliable signal.
 
 **Figures (bar panels, one figure per ecoregion).** X axis: years since treatment. Y axis: DART effect (Δ RAP cover), with a line at zero. Fill: whether the DART result was significant (`TRUE`/`FALSE`), the two dodged side by side within each year. Facets: coarse treatment, one panel each. One figure is drawn per ecoregion, named in the figure title along with the cover response and objective.
 
@@ -358,6 +423,8 @@ This section attempts to answer two questions:
 (2) How *large* are those effects? The mean-effect table and figure further down. A year can have a handful of significant pixels that each moved a long way, or many pixels that each moved a little, and those are different results.
 
 No weighting is used anywhere in this section. The mean effect per year is a plain arithmetic mean of `effect` over the significant pixels in that year, split by direction of effect, so the reported peak is the year whose significant pixels actually moved furthest rather than a significance-weighted compromise across the whole time series. Some weighting methods were checked and did not improve the results - see `weight_testing_summary.Rmd` for that analysis.
+
+Everything in this section is drawn on the **truncated** series: `r if (is.na(year_trunc$trunc_at)) paste0('for this objective no year fell below the ', min_year_n_i, '-', year_trunc$metric, '-pixel threshold, so the full record to year ', year_trunc$last_kept, ' is used') else paste0('for this objective the record is cut at year ', year_trunc$last_kept, ', because year ', year_trunc$trunc_at, ' was the first with fewer than ', min_year_n_i, ' ', year_trunc$metric, ' pixels')`. This is what stops a peak year being reported from the part of the record where almost nothing was significant; it also means the x axis here can end earlier than another objective's, so the two are not read off the same range.
 
 ```{r results-{{r_ind}}_18, echo = F}
 sig_by_year <- s_0$input |>
@@ -551,7 +618,7 @@ knitr::kable(time_summary_by_eco, col.names = c('Ecoregion', col_lab_time[-1]))
 options(old_na)
 ```
 
-**Tables.** Each polygon is reduced to the single year in which its own % significant pixels was highest ("peak significance year"); those per-polygon peak years are then summarized across polygons, by treatment in the first table and by ecoregion in the second. Columns: number of polygons behind the row, mean / SD / min / max of the peak year, and the percentage of polygons whose peak fell on the last year they were observed. A polygon's peak year is flagged as "censored" in those cases, because we can't rule out that significance was still rising beyond the end of the available time series. What that censoring implies is taken up under *Interpretation* at the top of the report.
+**Tables.** Each polygon is reduced to the single year in which its own % significant pixels was highest ("peak significance year"); those per-polygon peak years are then summarized across polygons, by treatment in the first table and by ecoregion in the second. Columns: number of polygons behind the row, mean / SD / min / max of the peak year, and the percentage of polygons whose peak fell on the last year they were observed. A polygon's peak year is flagged as "censored" in those cases, because we can't rule out that significance was still rising beyond the end of the available time series. Note that "last year observed" now means the last year *retained* after the late-year truncation described above, so where a series was truncated the censoring flag is partly an artefact of the threshold rather than of the record itself - it marks the end of the analysable series, not necessarily the end of the data. What that censoring implies is taken up under *Interpretation* at the end of the report.
 
 #### How often does this objective overlap with other objectives?
 

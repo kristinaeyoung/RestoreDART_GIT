@@ -8,7 +8,7 @@ output: html_document
 ## Notes
 
 * This report is written as one section per (objective x cover response) combination - i.e. per element of `summaries`. Those sections are all generated from a single template, `_objective_block.Rmd`, which the `objective_blocks` chunk below expands once per objective with `knitr::knit_expand()` and renders with `knitr::knit_child()`. Chunk labels come out as `results-X_Y`, where `X` is the objective's index (`r_ind`) and `Y` counts the chunks within that objective's block from 0. Editing any part of a per-objective section means editing the template, not this file.
-* Each section trims its own sparse (treatment x ecoregion) combinations and writes the trimmed results back to `summaries_mod`, leaving `summaries` as the unmodified split of the input data. Every cross-objective table compiled at the end of the report is therefore built on post-filter data.
+* Each section applies three sample-size filters in order - sparse (treatment x ecoregion) cells, then treatment or ecoregion levels left depopulated by that, then truncation of the late-year tail - and writes the result back to `summaries_mod`, leaving `summaries` as the unmodified split of the input data. Every cross-objective table compiled at the end of the report is therefore built on post-filter data, and the filtering log in the compilation section records what each filter cost each objective. All three are configured in the setup chunk below and nowhere else.
 * Each section also stores its own copy of the tables that are compiled across objectives, under object names of the form `<prefix><objective>_<COVER>`; `collect_obj_tables()` gathers them at the end. Adding an objective to the report means adding it to the input data, not editing the compilation chunks.
 
 ```{r setup, message = F, warning = F, echo = F}
@@ -55,7 +55,48 @@ in_fl   <- '../../RestoreDART_DATA/claude_visible/1_combined_filter_input_data_0
 # the report records which threshold each objective was given and what it cost -
 # worth reading before comparing objectives to each other, since a compiled table
 # built on unequal thresholds is comparing unequally filtered samples.
-min_txeco_n <- c(default = 10, decrease_afg_AFG = 300)
+min_txeco_n <- c(default = 10, decrease_afg_AFG = 300, increase_pfg_PFG = 300, increase_shr_SHR = 300, decrease_shr_SHR = 300)
+
+# Whether to drop a whole treatment or ecoregion LEVEL that the cell filter
+# above has left below the same threshold. The cell filter works on (treatment x
+# ecoregion) combinations, so it cannot see a level that has been thinned across
+# many surviving cells rather than emptied out of any one of them - a treatment
+# can lose most of its cells and be left with a scattering of pixels without any
+# single dropped cell looking unusual.
+#
+# The threshold is deliberately the same `min_txeco_n` number rather than a
+# second knob, so each objective has one sample-size floor rather than two to
+# reconcile. Applied by drop_depopulated_levels(), one pass: treatment levels
+# first, then ecoregion totals recomputed on the reduced frame, not iterated to
+# a fixed point. What it removed per objective is in the filtering log's
+# `# Tx Depopulated` / `# Eco Depopulated` columns, which are 0 when this is
+# FALSE.
+drop_depopulated <- TRUE
+
+# Minimum sample size per YEAR SINCE TREATMENT. Keyed and resolved exactly like
+# `min_txeco_n` (see keyed_threshold()), with a `default` entry and optional
+# per-objective overrides. Applied by truncate_late_years(): the first year
+# below the threshold is found and that year together with EVERY YEAR AFTER IT
+# is dropped, whether or not a later year happens to clear the threshold again.
+#
+# Truncation rather than per-year exclusion, because the per-year sample size
+# falls monotonically as polygons drop out of the post-treatment record - a year
+# that fails marks where the record stops supporting a comparison, and a later
+# year that clears it is a blip inside an already-unreliable tail. Dropping the
+# whole tail keeps the x axis of every per-year figure meaning one thing.
+#
+# `year_trunc_metric` decides what is counted, and the choice matters more than
+# the threshold value does:
+#   'significant' - significant pixels in that year. This is the quantity the
+#      problem is about: mean_effect_by_year() and peak_effect_year() average
+#      over significant pixels only, so a year with a thousand pixels and four
+#      significant ones still produces a published peak backed by four.
+#   'pixels' - every pixel observed in that year, the direct analogue of
+#      `min_txeco_n`. On this data the per-year totals stay in the hundreds to
+#      the end of every objective's record (the smallest is 44), so a small
+#      total-pixel threshold truncates nothing at all.
+min_year_n        <- c(default = 10)
+year_trunc_metric <- 'significant'
 
 # Read in the combined filter input data and split by objective. Each element of [split_by_objective()]
 # is named as `[direction]_[cover]_[RESPONSE]`, where the combination of direction and cover
@@ -109,44 +150,7 @@ total_poly_all <- sum(poly_by_elem)
 
 ## Terminology: raw sign versus management intent
 
-"positive"/"negative" and "intended"/"unintended" are used here for two different things, and they are not interchangeable. "Positive effect" and "negative effect" always refer to the raw sign of the (differenced) RAP cover effect itself, independent of any objective - a positive effect means RAP cover went up, a negative effect means it went down. "Intended" and "unintended" always refer to that same raw sign *relative to the assigned objective's management goal*: for a `decrease_*` objective, a negative effect is intended and a positive effect is unintended; for an `increase_*` objective, it's the reverse. So a significant positive effect is a *good* (intended) result under `increase_pfg`, but a *bad* (unintended) result under `decrease_afg` - same raw sign, opposite management meaning. `get_intended_sign()`, `label_intended()` and `intended_dir_word()` (`helper_functions.R`) encode this mapping in one place so it's applied consistently everywhere this distinction matters (e.g. `reduce_s0()`'s `sig_des`/`sig_und` columns, the "Intended"/"Unintended" columns of the summary table below, and the stacking order of the direction figures). Sections that compare *raw* positive-effect rates across objectives (e.g. the `summarize_sig_effect()` calls in each section) are deliberately using the raw, objective-agnostic sign for an apples-to-apples comparison, not the intended/unintended framing.
-
-## Summary results
-
-### Interpretation
-
-This section is plain markdown, written by hand. Nothing below it is generated from `_objective_block.Rmd`, so text written here is not overwritten when the report is re-rendered and does not need to be expressed as template code. The generated per-objective sections follow the horizontal rule below; this is the place to say what they mean.
-
-Write in whatever structure ends up being useful - the headings below are a starting point, not a fixed schema, and any of them can be deleted or renamed.
-
-#### Across all objectives
-
-To be written.
-
-#### By objective x cover response
-
-One paragraph (or bullet) per objective x cover response, named the same way the generated sections are titled, e.g. `decrease_afg` (AFG).
-
-`decrease_afg` (AFG) - carried over verbatim from the single-objective version of this report, since these were the only written interpretations it contained:
-
-- Intended versus unintended: "I would hypothesize that the very strong unintended-effect result has to do with disturbance effects or the interact effects of compound objectives."
-- By fine objective: "While some complex objectives are significantly different from `decrease_afg` alone, no clear pattern is emergent." (Written when the fine-objective table was accompanied by pairwise Fisher comparisons against `decrease_afg` as the baseline; those comparisons have since been removed from the report, so the "significantly different" claim no longer has a table behind it.)
-- By treatment: "Again, the pattern is not helpful in explaining itself."
-- By ecoregion: "There are too many categories here to make pairwise comparisons helpful. I don't have enough personal knowledge to guess why `Uinta Basin Floor` was so much higher than the other ecoregions." (The first sentence was the rationale for not running pairwise comparisons on ecoregion; that rationale now lives as a code comment in the template, and pairwise comparisons are off for all three groupings. The `Uinta Basin Floor` observation was made on the `decrease_afg`/AFG data and has not been re-checked against the other objectives.)
-
-Remaining objective x cover response combinations: to be written.
-
-#### Time since treatment
-
-To be written. The per-year and binned significance results, the mean-effect peaks, and the censoring flags all speak to this.
-
-Carried over from the single-objective version of this report, where it sat with the per-polygon peak/trough tables: a polygon's peak (or trough) year is flagged as censored when it falls on the last year that polygon was observed, so in those cases we can't rule out that significance was still rising (or falling) beyond the end of the available time series. "There are implications here for stable-state-change discussion."
-
-#### Caveats and open questions
-
-To be written. Two caveats apply throughout and are worth restating wherever a number is quoted: the objective groupings are not a partition (a pixel counts toward an objective if it fell in any part of that objective, so multi-objective treatments appear in several groupings and parts of the dataset are counted more than once), and an objective/response pairing is only included when the response cover type matches the objective's target cover.
-
----
+"positive"/"negative" and "intended"/"unintended" are used here for two different things, and they are not interchangeable. "Positive effect" and "negative effect" always refer to the raw sign of the (differenced) RAP cover effect itself, independent of any objective - a positive effect means RAP cover went up, a negative effect means it went down. "Intended" and "unintended" always refer to that same raw sign *relative to the assigned objective's management goal*: for a `decrease_*` objective, a negative effect is intended and a positive effect is unintended; for an `increase_*` objective, it's the reverse. So a significant positive effect is a *good* (intended) result under `increase_pfg`, but a *bad* (unintended) result under `decrease_afg` - same raw sign, opposite management meaning. `get_intended_sign()`, `label_intended()` and `intended_dir_word()` (`helper_functions.R`) encode this mapping in one place so it's applied consistently everywhere this distinction matters (e.g. `reduce_s0()`'s `sig_des`/`sig_und` columns, the "Intended"/"Unintended" columns of the summary table below, and the stacking order of the direction figures). Which of the two a given table or figure uses now follows a single rule: **within one objective's section, intended; across objectives, raw sign.** The three `summarize_sig_effect()` figures in each section (by fine objective, by treatment, by ecoregion) report the *intended* effect, because every level on those axes shares that section's management goal and a bar labelled "significant positive" invited reading a `decrease_*` objective's failures as successes. The compiled tables at the end of the report keep the raw sign, because their rows come from different objectives and the sign has to mean the same thing in every row for them to be read against each other - an intended-effect column pooled across `decrease_afg` and `increase_pfg` would be counting opposite raw signs in the same column. The consequence worth remembering: a per-section percentage and a compiled-table percentage for the same objective are not the same quantity, and for a `decrease_*` objective they are close to complements.
 
 ```{r objective_blocks, echo = F, results = 'asis'}
 # One results section per element of `summaries`, all rendered from the single
@@ -166,24 +170,63 @@ obj_block_out <- lapply(seq_along(summaries), function(i) {
 cat(unlist(obj_block_out), sep = '\n\n')
 ```
 
-```{r results_total, echo = F, eval = FALSE}
+## Cross-objective direction checks
 
-# When decrease tree is the goal, what do AFG, SHR, and PFG group directions look like?
+Each of the three checks below asks what happened to the *non-target* cover responses while a given objective was the management goal - e.g. when the objective was to decrease tree cover, what did annual forb and grass, shrub and perennial forb and grass cover do in those same treated pixels? These are the questions KY asked for, and they are the one part of the report that cannot be answered from `summaries`: `split_by_objective()` only ever pairs an objective with its own matching cover response, so the other responses for those pixels have to be re-filtered out of `combined_df` directly (see `compare_related_directions()`).
+
+Two things follow from starting at `combined_df`, and both differ from every other section of this report. First, the denominators here are the **full post-treatment dataset** for the named objective, not the post-filter `summaries_mod` data - no sparse treatment x ecoregion combination has been dropped, so these percentages are not directly comparable with the compiled tables below. Second, the percentages are raw positive/negative rates rather than intended/unintended: for a non-target cover response there is no assigned objective against which a sign could be called intended, which is exactly why the raw sign is the right thing to report.
+
+```{r results_total_tre, echo = F}
+# Previously `eval = FALSE`, so none of this section rendered. It was switched on
+# once the error recorded here was traced: the third call below asked for the
+# objective 'decrease_shb', which does not exist in the input data - the shrub
+# objective is coded 'decrease_shr' (matching the SHR `fun_group`, and the
+# 'shr' suffix split_by_objective() uppercases to pair the two). grepl() on the
+# misspelled string matched no rows, so compare_related_directions() failed on
+# its own `stopifnot(nrow(df) > 0)` guard rather than returning an empty table -
+# which is the intended behaviour of that guard, since an empty result here
+# means the filter was wrong, not that the data is uninteresting.
 res_decrease_tre <- compare_related_directions(combined_df, 'decrease_tre', c('AFG', 'SHR', 'PFG'))
-knitr::kable(res_decrease_tre$table, col.names = c('Cover Response', 'Total Pixels', '% Significant', '% Significant Positive', '% Significant Negative'))
+knitr::kable(
+  res_decrease_tre$table,
+  col.names = c('Cover Response', 'Total Pixels', '% Significant', '% Significant Positive', '% Significant Negative'),
+  caption = 'Cover responses in pixels where decreasing tree cover was an objective: one row per cover response, with the percentage of that response\'s pixels carrying a significant DART effect and that percentage split by the raw sign of the effect. Percentages are of all post-treatment pixels for this objective, unfiltered.',
+  digits = 2
+)
 res_decrease_tre$plot
-
-# When increase PFG is the goal, what does AFG directions look like?
-res_increase_pfg <- compare_related_directions(combined_df, 'increase_pfg', c('AFG'))
-knitr::kable(res_increase_pfg$table, col.names = c('Cover Response', 'Total Pixels', '% Significant', '% Significant Positive', '% Significant Negative'))
-res_increase_pfg$plot
-
-# TODO: this section throws an error in compare_related_directions: nrow(df) > 0 is not TRUE
-# When decrease SHB was the goal, what does AFG, PFG, TRE directions look like?
-res_decrease_shb <- compare_related_directions(combined_df, 'decrease_shb', c('AFG', 'PFG', 'TRE'))
-knitr::kable(res_decrease_shb$table, col.names = c('Cover Response', 'Total Pixels', '% Significant', '% Significant Positive', '% Significant Negative'))
-res_decrease_shb$plot
 ```
+
+**Table and figure.** X axis of the figure: cover response (`'fun_group'`) - the non-target responses AFG, SHR and PFG, in pixels where `decrease_tre` was one of the assigned objectives. Y axis: proportion of that response's pixels, with each bar filled to 1. Fill: whether the DART result was significant (`TRUE`/`FALSE`), so the bar reads as the significant share of that response. No facets. The figure shows only *whether* an effect was detected; the direction split is in the table above it, not on the figure.
+
+```{r results_total_pfg, echo = F}
+# When increase PFG is the goal, what do AFG directions look like?
+res_increase_pfg <- compare_related_directions(combined_df, 'increase_pfg', c('AFG'))
+knitr::kable(
+  res_increase_pfg$table,
+  col.names = c('Cover Response', 'Total Pixels', '% Significant', '% Significant Positive', '% Significant Negative'),
+  caption = 'As above, for pixels where increasing perennial forb and grass cover was an objective, looking at the AFG response only.',
+  digits = 2
+)
+res_increase_pfg$plot
+```
+
+**Table and figure.** As above, for `increase_pfg` and the single non-target response AFG. X axis: cover response (one level, AFG). Y axis: proportion of AFG pixels, filled to 1. Fill: whether the DART result was significant. No facets. With only one cover response on the axis the figure adds nothing to the table; it is drawn for consistency with the other two checks.
+
+```{r results_total_shr, echo = F}
+# When decrease SHR was the goal, what do AFG, PFG, TRE directions look like?
+# NB: the objective is 'decrease_shr', not 'decrease_shb' - see the comment in
+# the first chunk of this section.
+res_decrease_shr <- compare_related_directions(combined_df, 'decrease_shr', c('AFG', 'PFG', 'TRE'))
+knitr::kable(
+  res_decrease_shr$table,
+  col.names = c('Cover Response', 'Total Pixels', '% Significant', '% Significant Positive', '% Significant Negative'),
+  caption = 'As above, for pixels where decreasing shrub cover was an objective, looking at the AFG, PFG and TRE responses.',
+  digits = 2
+)
+res_decrease_shr$plot
+```
+
+**Table and figure.** As above, for `decrease_shr` and the non-target responses AFG, PFG and TRE. X axis: cover response. Y axis: proportion of that response's pixels, filled to 1. Fill: whether the DART result was significant. No facets.
 
 ## Compiled results across objectives
 
@@ -220,12 +263,30 @@ poly_sig_all <- do.call(rbind, lapply(seq_along(summaries_mod), function(i) {
 #### Sample-size filtering applied
 
 ```{r compile_filter_log, echo = F}
+old_na <- options(knitr.kable.NA = '')
 knitr::kable(
   filter_log_all,
-  col.names = c('Objective', 'Cover', 'Min. Pixels per Tx x Ecoregion', '# Combinations Excluded', '% Pixels Lost', '# Treatments Dropped', '# Ecoregions Dropped'),
-  caption = 'Sample-size filtering per objective x cover response: the minimum-pixel threshold that combination was given, how many treatment x ecoregion combinations fell below it, the percentage of that objective\'s pixels lost as a result, and how many treatment or ecoregion levels disappeared entirely. Thresholds are set in the setup chunk and default to the same value for every objective; where they differ, the tables below are built on unequally filtered samples and should be compared with that in mind.',
+  col.names = c(
+    'Objective', 'Cover',
+    'Min. Pixels per Tx x Ecoregion', '# Combinations Excluded',
+    '# Tx Depopulated', '# Eco Depopulated',
+    paste0('Min. ', tools::toTitleCase(year_trunc_metric), ' Pixels per Year'),
+    'Truncated From Year', '# Years Dropped',
+    '% Pixels Lost (All Filters)',
+    '# Treatments Absent', '# Ecoregions Absent'
+  ),
+  caption = paste0(
+    'Sample-size filtering per objective x cover response, one row each, reading left to right in the order the three filters are applied. ',
+    '(1) Sparse cells: the minimum-pixel threshold that combination was given and how many treatment x ecoregion combinations fell below it. ',
+    '(2) Depopulated levels: how many whole treatment or ecoregion levels were then left below that same threshold and removed - 0 everywhere if `drop_depopulated` is FALSE, which it is not in this run. ',
+    '(3) Late-year truncation: the minimum per-year count required, the first year that fell below it, and how many years were dropped from there to the end of the record; a blank means no year fell below the threshold and the series was not truncated. ',
+    'The metric counted per year is "', year_trunc_metric, '" pixels (see the setup chunk) - on total pixels a small threshold truncates nothing on this data, so the choice of metric matters more than the number. ',
+    '"% Pixels Lost" is the combined cost of all three filters, not of any one. The last two columns count levels ABSENT from the post-filter data for any reason, which includes levels that only ever appeared in sparse cells and so is not the same quantity as the depopulated counts. ',
+    'Thresholds differ by objective here, so every compiled table below is comparing unequally filtered samples and should be read with this table alongside it.'
+  ),
   digits = 2
 )
+options(old_na)
 ```
 
 #### Overall significance rate
@@ -291,9 +352,27 @@ knitr::kable(
   caption = 'Significance rates binned by years since treatment (1-5, 6-10, 11-15, 16+), one row per objective x cover response x bin.',
   digits = 2
 )
-
-# TODO: create a ggplot figure that summarizes these table results
 ```
+
+The two tables above answer the two different questions this report keeps separate throughout the time-since-treatment work, and each gets its own figure below: how **large** the significant effects were and when they peaked (`peak_effect_all`, first figure), and how **often** a significant effect occurred within each year bin (`sig_by_bin_all`, second figure). They can disagree - a bin can carry a high significance rate made up of small effects, or a small number of large ones - so they are drawn as two figures rather than combined into one.
+
+```{r compile_peak_effect_plot, echo = F}
+plot_peak_effect_summary(
+  peak_effect_all,
+  subtitle = 'One panel per objective x cover response; significant pixels only, unweighted'
+)
+```
+
+**Figure.** X axis: years since treatment at which the mean DART effect over significant pixels was largest in magnitude - the `Peak Year` column of the first table above. Y axis: the mean DART effect (Δ RAP cover) at that peak year, with the vertical bar showing ± 1 SE of that mean (the `SE` column); the horizontal line marks zero, which the two directions sit either side of by construction. Colour: direction of the effect (red = significant positive, blue = significant negative), the same colours used in every direction figure in this report, with the two directions never averaged together. Shape: whether the peak is censored - a filled circle is a peak falling inside the record, a hollow circle a peak landing on the last year observed for that direction, where the effect may still have been growing past the end of the record. Facets: objective x cover response, one panel each, on a shared y axis so panels can be compared against each other. The `n = ` label on each point is the number of significant pixels behind that peak mean, which for late peaks is frequently in the tens - a peak backed by ten pixels sits on the same axis as one backed by thousands, and the axis alone does not say which is which.
+
+```{r compile_sig_by_bin_plot, echo = F}
+plot_sig_by_bin_summary(
+  sig_by_bin_all,
+  subtitle = 'One panel per objective x cover response; bars are all pixels in that bin, not just significant ones'
+)
+```
+
+**Figure.** X axis: years since treatment, binned as 1-5, 6-10, 11-15 and 16+ - the `Year Bin` column of the second table above. Y axis: the percentage of that bin's pixels with a significant DART effect, so the full height of a bar is the bin's overall rate and the denominator is every pixel observed in that bin, significant or not. Fill: the direction of the significant effect, splitting each bar into a blue *significant negative* component against the axis and a red *significant positive* component above it; the two sum to the bar's full height. Unlike the per-year stacked figure in each objective's section, the stacking order is the same in every panel rather than putting the intended direction against the axis, because intent differs between panels - negative is intended for a `decrease_*` objective and positive for an `increase_*` one - so the fill colours carry the raw sign only and the objective name in the panel strip says which of them was wanted. Facets: objective x cover response, one panel each, on a shared y axis. The rotated `n = ` label above each bar is that bin's total pixel count, i.e. the denominator of the percentage rather than the count of significant pixels.
 
 #### Objective overlap
 
@@ -326,6 +405,8 @@ knitr::kable(
 )
 ```
 
+The same table is also written out a second time with its columns renamed and reordered to match `table_restoredart_template.xlsx`, the reporting spreadsheet requested by email, as `2_DART_results_summary_table_template.csv`. The mapping is `summary_template_map()` in `helper_functions.R`: names are the template's headers copied verbatim from row 1 of the spreadsheet - including its "desired"/"undesired" wording, which is that spreadsheet's vocabulary for what this report calls intended/unintended - and values are the compiled table's own column names. It is a first pass meant to be corrected by hand, and two entries are guesses rather than readings: the template's first header is "% or # of time this was the objective" and the compiled table has both forms, so the percentage is used; and column H of the template has no header at all, so it is mapped to the overall significant-pixel count on the strength of its position between "Number polygons" and "# of pixels Significant & desired". Compiled columns the template does not ask for (`n_time_objective`, `n_time_treatment`, `pct_time_treatment`) are appended after the mapped ones under their own names rather than dropped, so it stays visible which columns the template asked for. Nothing writes the `.xlsx` itself - that would need a package this report does not depend on.
+
 #### Tables written to .csv
 
 ```{r write_csv, echo = F}
@@ -334,6 +415,19 @@ knitr::kable(
 # spreadsheet without re-rendering. `txeco_post_all` (post-filter treatment x
 # ecoregion pixel counts) is not displayed anywhere in the report - it exists only
 # to be written out here.
+# `summary_table_template` is the same table as `summary_table`, with its columns
+# renamed and reordered to match row 1 of `table_restoredart_template.xlsx` so it
+# can be pasted straight into the reporting spreadsheet. The mapping lives in
+# summary_template_map() and is meant to be edited by hand - two of its entries
+# are guesses (the template's "% or # of time this was the objective", which
+# could be either of two compiled columns, and its unnamed column H). Compiled
+# columns the template does not ask for are appended after the mapped ones under
+# their own names rather than dropped.
+#
+# No .xlsx is written: that needs openxlsx or writexl and neither is installed,
+# so this stops at the .csv rather than adding a dependency.
+summary_tmpl_all <- map_summary_to_template(summary_tbl_all)
+
 csv_tables <- list(
   filtering_log                 = filter_log_all,
   txeco_pixel_counts_postfilter = txeco_post_all,
@@ -343,7 +437,8 @@ csv_tables <- list(
   peak_effect_year              = peak_effect_all,
   year_bin_significance         = sig_by_bin_all,
   objective_overlap             = overlap_tbl_all,
-  summary_table                 = summary_tbl_all
+  summary_table                 = summary_tbl_all,
+  summary_table_template        = summary_tmpl_all
 )
 
 if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
@@ -365,3 +460,60 @@ knitr::kable(
   caption = paste0('Compiled tables written to `', out_dir, '`. A table that came back empty is skipped rather than written as an empty file.')
 )
 ```
+
+---
+
+## Summary results
+
+### Interpretation
+
+This section is plain markdown, written by hand, and it now sits at the **end** of the report rather than ahead of the results. Everything above the horizontal rule is generated - the per-objective sections from `_objective_block.Rmd`, the cross-objective checks and the compiled tables - and nothing here is, so text written here is not overwritten when the report is re-rendered and does not need to be expressed as template code. It reads better last: the interpretations refer to tables and figures by name, and a reader who has just passed those tables does not have to scroll forward to find what is being described.
+
+Write in whatever structure ends up being useful - the headings below are a starting point, not a fixed schema, and any of them can be deleted or renamed.
+
+#### Across all objectives
+
+To be written.
+
+#### By objective x cover response
+
+One paragraph (or bullet) per objective x cover response, named the same way the generated sections are titled, e.g. `decrease_afg` (AFG).
+
+`decrease_afg` (AFG):
+
+- This was the only objective that achieved mostly the opposite of what it intended in that the direction of effect was usually positive, while the attempted effect was negative. I would hypothesize that the very strong unintended-effect result has to do with disturbance effects or the interact effects of compound objectives.
+- Significance patterns over fine objectives are highly heterogenous, but too complex to interpret casually.
+- Significance patterns over treatments are also highly heterogenous, but similarily complex.
+- Significance patterns over ecoregion probably require some environmental context, or an expert eye. For example I don't have enough personal knowledge to guess why `Uinta Basin Floor` was so much higher than the other ecoregions."
+- Treatment was generally not successful.
+
+`increase_pfg` (PFG): 
+
+- Significance patterns over fine objectives are highly heterogenous, but too complex to interpret casually.
+- Significance patterns over treatments are also highly heterogenous, but similarily complex.
+- Significance patterns over ecoregion probably require some environmental context, or an expert eye.
+- Time effects look to be very positive earlier in the treatment (< 20 YST) but then become negative after that, indicating a potential regression of treatment effects
+- Treatment looked generally successful
+
+`increase_shr` (SHR):
+
+- Mostly same considerations as `increase_pfg`
+- Time effects are negative immediately after treatment, then stay generally positive
+- Treatment looked generally successful. 
+
+`decrease_shr` (SHR):
+
+- Treatment looked successful, but at a smaller magnitude than the other objectives
+- needs more details
+
+Remaining objective x cover response combinations: to be written.
+
+#### Time since treatment
+
+To be written. The per-year and binned significance results, the mean-effect peaks, and the censoring flags all speak to this.
+
+Carried over from the single-objective version of this report, where it sat with the per-polygon peak/trough tables: a polygon's peak (or trough) year is flagged as censored when it falls on the last year that polygon was observed, so in those cases we can't rule out that significance was still rising (or falling) beyond the end of the available time series. "There are implications here for stable-state-change discussion."
+
+#### Caveats and open questions
+
+To be written. Two caveats apply throughout and are worth restating wherever a number is quoted: the objective groupings are not a partition (a pixel counts toward an objective if it fell in any part of that objective, so multi-objective treatments appear in several groupings and parts of the dataset are counted more than once), and an objective/response pairing is only included when the response cover type matches the objective's target cover.

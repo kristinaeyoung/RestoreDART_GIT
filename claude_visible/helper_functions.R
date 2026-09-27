@@ -47,26 +47,29 @@ fmt_level_list <- function(x, none_text = 'none') {
   if (!length(x)) return(none_text)
   paste0('`', x, '`', collapse = ', ')
 }
-txeco_threshold <- function(elem_name, thresholds) {
-  # Resolves the (treatment x ecoregion) minimum-pixel threshold to use for one
-  # element of `summaries`, allowing the threshold to differ by objective x cover
-  # response instead of being one number for the whole report.
+keyed_threshold <- function(elem_name, thresholds, what = 'threshold') {
+  # Generic resolver for any PER-OBJECTIVE keyed threshold in this report. The
+  # report now has two of them - `min_txeco_n` (pixels per treatment x ecoregion
+  # combination) and `min_year_n` (sample size per year since treatment) - and
+  # they are keyed and resolved identically, so the lookup lives here once
+  # rather than being copied per threshold.
   #
   # `thresholds` is a named numeric vector whose names are either full element
-  # names of `summaries` ("<objective>_<COVER>", e.g. "decrease_afg_AFG") or bare
-  # objectives ("decrease_afg"); the two are interchangeable in practice, since
-  # split_by_objective() pairs each objective with exactly one cover response.
-  # A `default` entry is required and is used for any element not named
-  # explicitly, so adding an override is a one-line edit to the setup chunk and
-  # leaves every other objective alone.
+  # names of `summaries` ("<objective>_<COVER>", e.g. "decrease_afg_AFG") or
+  # bare objectives ("decrease_afg"); the two are interchangeable in practice,
+  # since split_by_objective() pairs each objective with exactly one cover
+  # response. A `default` entry is required and is used for any element not
+  # named explicitly, so adding an override is a one-line edit to the setup
+  # chunk and leaves every other objective alone.
   #
   # Lookup is most-specific-first (full element name, then bare objective, then
   # `default`) so that naming an objective explicitly always wins over the
-  # fallback, whichever form it was named in.
+  # fallback, whichever form it was named in. `what` only appears in the error
+  # message, so a missing `default` names the threshold that lacks one.
 
   stopifnot(is.numeric(thresholds), !is.null(names(thresholds)))
   if (!('default' %in% names(thresholds))) {
-    stop('txeco_threshold(): `thresholds` must include a "default" entry')
+    stop(sprintf('keyed_threshold(): `%s` must include a "default" entry', what))
   }
 
   bare_obj <- sub('_[A-Z]+$', '', elem_name)
@@ -74,6 +77,146 @@ txeco_threshold <- function(elem_name, thresholds) {
   for (key in c(elem_name, bare_obj, 'default')) {
     if (key %in% names(thresholds)) return(unname(thresholds[[key]]))
   }
+}
+txeco_threshold <- function(elem_name, thresholds) {
+  # The (treatment x ecoregion) minimum-pixel threshold for one element of
+  # `summaries`. Kept as its own name because it is what the template and the
+  # report prose refer to; the lookup itself is keyed_threshold() above.
+  #
+  # See keyed_threshold() for the keying rules and the most-specific-first
+  # lookup order; nothing here differs from any other per-objective threshold.
+
+  keyed_threshold(elem_name, thresholds, what = 'min_txeco_n')
+}
+year_threshold <- function(elem_name, thresholds) {
+  # The minimum per-year sample size for one element of `summaries`, below which
+  # that year and every year after it are dropped (see truncate_late_years()).
+  # Same keying and lookup as min_txeco_n.
+
+  keyed_threshold(elem_name, thresholds, what = 'min_year_n')
+}
+drop_depopulated_levels <- function(
+    df_in, min_n, cols = c('tx_coarse', 'us_l4name')
+) {
+  # Drops whole treatment or ecoregion LEVELS whose post-filter pixel total has
+  # fallen below `min_n`.
+  #
+  # This exists because the sparse-combination filter operates on (treatment x
+  # ecoregion) CELLS, not on either margin: a treatment that appears in many
+  # cells can lose most of them and be left with a handful of pixels spread
+  # across the survivors, without any single dropped cell looking unusual. The
+  # report already reported that possibility (the post-filter per-treatment and
+  # per-ecoregion totals, with the smallest surviving total quoted against the
+  # cell-level threshold); this acts on it.
+  #
+  # The threshold is deliberately the same number as the cell-level
+  # `min_txeco_n` for that objective, so there is one sample-size floor in the
+  # section rather than two to reconcile.
+  #
+  # One pass, in the order `cols` is given: treatment levels are dropped first,
+  # then ecoregion totals are recomputed on the already-reduced frame, so an
+  # ecoregion that only survived because of a since-dropped treatment is caught.
+  # It is NOT iterated to a fixed point - dropping an ecoregion could in
+  # principle re-depopulate a treatment that passed the first check. That is
+  # left alone deliberately: iterating would make the amount of data removed
+  # depend on a convergence loop that is invisible in the output, and the
+  # filtering log would no longer be readable as "this is what each filter
+  # cost". The log records what this pass removed; a second pass would show up
+  # as a non-zero count on a re-run.
+
+  dropped <- stats::setNames(vector('list', length(cols)), cols)
+  out <- df_in
+
+  for (cl in cols) {
+    tb  <- table(out[[cl]])
+    low <- names(tb)[tb < min_n]
+    dropped[[cl]] <- low
+    if (length(low)) out <- out[!(out[[cl]] %in% low), , drop = FALSE]
+  }
+
+  attr(out, 'levels_dropped') <- dropped
+  return(out)
+}
+truncate_late_years <- function(
+    df_in, min_n, metric = c('significant', 'pixels'),
+    col_year = 'year_diff', col_sig = 'sig'
+) {
+  # Truncates the time series: finds the FIRST year since treatment whose sample
+  # size falls below `min_n` and drops that year together with every year after
+  # it, whether or not those later years individually clear the threshold.
+  #
+  # Truncation rather than per-year exclusion is the point. The per-year sample
+  # size falls monotonically as polygons drop out of the post-treatment record,
+  # so a year that fails the threshold marks where the record stops being able
+  # to support a comparison, and a later year that happens to clear it again is
+  # a blip in a part of the series that is already unreliable. Dropping the
+  # whole tail keeps the x axis of every per-year figure meaning the same thing.
+  #
+  # `metric` chooses what is counted:
+  #   'significant' - significant pixels in that year (the default). This is the
+  #      quantity the late-year problem is actually about: mean_effect_by_year()
+  #      and peak_effect_year() average over significant pixels only, so a year
+  #      with thousands of pixels and four significant ones still yields a
+  #      published peak with n = 4 behind it.
+  #   'pixels' - every pixel observed in that year, significant or not. The
+  #      direct analogue of `min_txeco_n`, which is also a total-pixel count.
+  #      Note that on this data the per-year totals stay in the hundreds to the
+  #      very end of every objective's record, so a small total-pixel threshold
+  #      truncates nothing.
+  #
+  # Returns the trimmed frame with a `year_trunc` attribute recording what was
+  # done, which the calling section puts in the filtering log.
+
+  metric <- match.arg(metric)
+
+  n_by_year <- if (metric == 'pixels') {
+    table(df_in[[col_year]])
+  } else {
+    tapply(df_in[[col_sig]], df_in[[col_year]], sum)
+  }
+
+  # A year with no rows at all is absent from the tally rather than counted as
+  # zero, so it cannot trigger truncation. That is harmless here because
+  # year_diff is contiguous from 1 in every objective, but it would need
+  # reindexing over the full year range if a gap ever appeared.
+  yrs       <- as.integer(names(n_by_year))
+  ord       <- order(yrs)
+  yrs       <- yrs[ord]
+  n_by_year <- as.integer(n_by_year)[ord]
+
+  below <- which(n_by_year < min_n)
+
+  log_of <- function(trunc_at, keep) list(
+    metric    = metric,
+    min_n     = min_n,
+    trunc_at  = trunc_at,
+    n_dropped = if (is.na(trunc_at)) 0L else sum(yrs >= trunc_at),
+    pct_lost  = round(100 * (1 - sum(keep) / length(keep)), 2),
+    last_kept = if (any(keep)) max(df_in[[col_year]][keep]) else NA_integer_
+  )
+
+  if (!length(below)) {
+    out <- df_in
+    attr(out, 'year_trunc') <- log_of(NA_integer_, rep(TRUE, nrow(df_in)))
+    return(out)
+  }
+
+  cut_yr <- yrs[min(below)]
+  keep   <- df_in[[col_year]] < cut_yr
+
+  # Truncating at the first year leaves nothing to summarize. Caught here for
+  # the same reason the section catches an all-excluding `min_txeco_n`: the
+  # downstream failure is opaque and knitr would carry on with stale data.
+  if (!any(keep)) {
+    stop(sprintf(
+      'min_year_n = %s (metric "%s") truncates at year %s, the first year in the record - nothing is left; lower the threshold for this objective in the setup chunk.',
+      min_n, metric, cut_yr
+    ))
+  }
+
+  out <- df_in[keep, , drop = FALSE]
+  attr(out, 'year_trunc') <- log_of(cut_yr, keep)
+  return(out)
 }
 summarize_sig_overall <- function(df_in, objective_label, cover_label, col_sig = 'sig', col_effect = 'effect') {
   # Overall pixel-level significance rate for one objective x cover response,
@@ -221,6 +364,83 @@ summarize_intended_effect <- function(df_in, objective_label, cover_label, col_s
     pct_sig_und = round(100 * sum(lab == 'unintended') / n_tot, 1),
     stringsAsFactors = FALSE
   )
+}
+summary_template_map <- function() {
+  # Column mapping from the compiled summary table
+  # (`2_DART_results_summary_table.csv`) onto the headers of
+  # `table_restoredart_template.xlsx`, the reporting spreadsheet requested by
+  # email.
+  #
+  # NAMES are the template's headers, copied verbatim from row 1 of the
+  # spreadsheet - including its "desired"/"undesired" wording, which is the
+  # template's own vocabulary for what this report calls intended/unintended.
+  # The template's wording is kept rather than corrected, since the whole point
+  # of a mapping is that the spreadsheet stays as the collaborators expect it.
+  # VALUES are the column names of the compiled table.
+  #
+  # This is a first guess and is meant to be edited by hand. Two entries in
+  # particular are judgement calls:
+  #   - The template's first header reads "% or # of time this was the
+  #     objective", and the compiled table has both forms
+  #     (`pct_time_objective` and `n_time_objective`). The percentage is mapped
+  #     here because the header leads with "%"; swap in `n_time_objective` for
+  #     the count.
+  #   - Column H of the template has NO header at all. It sits between "Number
+  #     polygons" and "# of pixels Significant & desired", so it is mapped to
+  #     the overall significant-pixel count and given a name to match. If that
+  #     column was meant for something else, this is the entry to change.
+  #
+  # Compiled columns not named here keep their own names - see
+  # map_summary_to_template().
+
+  c(
+    '% or # of time this was the objective' = 'pct_time_objective',
+    'Objective'                             = 'objective',
+    'Cover response'                        = 'cover',
+    'Treatment method'                      = 'tx_coarse',
+    'Ecoregion'                             = 'us_l4name',
+    'Total pixels'                          = 'grp_n_pix',
+    'Number polygons'                       = 'grp_n_poly',
+    '# of pixels Significant'               = 'grp_n_sig',
+    '# of pixels Significant & desired'     = 'grp_n_sig_int',
+    '# of pixels Significant & undesired'   = 'grp_n_sig_uni',
+    '% desired'                             = 'grp_perc_int',
+    '% undesired'                           = 'grp_perc_uni'
+  )
+}
+map_summary_to_template <- function(tbl, mapping = NULL) {
+  # Renames and reorders the compiled summary table into the reporting
+  # spreadsheet's column order, so the result can be pasted into
+  # `table_restoredart_template.xlsx` under row 1 without rearranging columns
+  # by hand.
+  #
+  # Mapped columns come first, in the template's order, under the template's
+  # headers. Any remaining column of `tbl` is appended after them UNDER ITS OWN
+  # NAME - the compiled table is allowed to carry more columns than the
+  # template, and those extra names are deliberately left alone so it stays
+  # obvious which columns the template asked for and which are extra.
+  #
+  # Nothing here writes an .xlsx: that would need a new package dependency
+  # (openxlsx / writexl), and neither is installed. The output is written as a
+  # .csv alongside the other compiled tables instead.
+
+  if (is.null(mapping)) mapping <- summary_template_map()
+
+  absent <- setdiff(unname(mapping), colnames(tbl))
+  if (length(absent)) {
+    stop(sprintf(
+      'map_summary_to_template(): the summary table has no column(s) %s - update summary_template_map()',
+      paste(absent, collapse = ', ')
+    ))
+  }
+
+  out <- tbl[, unname(mapping), drop = FALSE]
+  colnames(out) <- names(mapping)
+
+  extra <- setdiff(colnames(tbl), unname(mapping))
+  if (length(extra)) out <- cbind(out, tbl[, extra, drop = FALSE])
+
+  return(`rownames<-`(out, NULL))
 }
 collect_obj_tables <- function(prefix, env = parent.frame()) {
   # Gathers the per-objective tables built in the body of the report into one
@@ -417,10 +637,19 @@ get_summary_DART_results <- function(
   poly_df <- data.frame(count = poly_df$count[poly_df$count > 0])
   poly_n_breaks <- max(poly_df) + 1
   
+  # One axis break per integer is only readable while the largest cell holds a
+  # dozen or so polygons. Across the five objectives the largest cell runs to
+  # the high thirties, and `breaks = seq(max)` then crams 39 labels onto the
+  # axis so they render as an unreadable run of digits. Breaks are thinned to
+  # about fifteen, on a whole-number interval so they still land on integer
+  # polygon counts (which is the reason not to leave this to ggplot's default
+  # breaks, which would happily label 2.5 polygons).
+  poly_break_by <- max(1, ceiling(max(poly_df) / 15))
+
   poly_plot <- ggplot(poly_df, aes(x = count)) +
     geom_histogram(bins = poly_n_breaks, fill = "grey35", colour = "white", linewidth = 0.3) +
     labs(x = "Count", y = "Frequency", title = paste0("Polygon counts\n(for each level of: ", col_tx, " x ", col_eco, ")")) +
-    scale_x_continuous(breaks = seq(max(poly_df))) +
+    scale_x_continuous(breaks = seq(1, max(poly_df), by = poly_break_by)) +
     theme_bw() +
     theme(axis.text = element_text(color = 'black'))
 
@@ -670,14 +899,42 @@ compare_related_directions <- function(
   
 }
 summarize_sig_effect <- function(
-    df, group_col, effect_dir = c('positive', 'negative'),
-    baseline = NULL, run_pairwise = TRUE, label = group_col,
+    df, group_col, effect_dir = c('positive', 'negative', 'intended', 'unintended'),
+    objective = NULL, baseline = NULL, run_pairwise = TRUE, label = group_col,
     sig_col = 'sig', effect_col = 'effect'
 ) {
-  
+  # Percentage of pixels in each level of `group_col` carrying a significant
+  # effect in one direction, plus the bar chart of the same.
+  #
+  # `effect_dir` selects the direction two different ways, and which one is
+  # appropriate depends on what the figure is being compared against (see the
+  # terminology section of the report):
+  #   'positive' / 'negative' - the RAW sign of the effect, objective-agnostic.
+  #      Use when levels of DIFFERENT objectives are being read against each
+  #      other and the sign has to mean the same thing in every row.
+  #   'intended' / 'unintended' - the sign relative to THIS objective's
+  #      management goal, which means `objective` must be supplied and the
+  #      resulting percentages are only comparable within one objective. This
+  #      is what a per-objective section wants: under `decrease_afg` a
+  #      significant positive effect is a failure, and a figure titled
+  #      "significant positive effects" invites reading it as a success.
+  #
+  # The sign is resolved through get_intended_sign(), never hard-coded, so this
+  # agrees with label_intended(), reduce_s0() and intended_dir_word().
+
   effect_dir <- match.arg(effect_dir)
-  cmp <- if (effect_dir == 'positive') `>` else `<`
-  
+
+  if (effect_dir %in% c('intended', 'unintended')) {
+    if (is.null(objective)) {
+      stop("summarize_sig_effect(): `objective` is required when effect_dir is 'intended' or 'unintended'")
+    }
+    want_sign <- get_intended_sign(objective)
+    if (effect_dir == 'unintended') want_sign <- -want_sign
+    cmp <- if (want_sign > 0) `>` else `<`
+  } else {
+    cmp <- if (effect_dir == 'positive') `>` else `<`
+  }
+
   df$.sig_flag <- df[[sig_col]] == TRUE & cmp(df[[effect_col]], 0)
   
   grp_summary <- df |>

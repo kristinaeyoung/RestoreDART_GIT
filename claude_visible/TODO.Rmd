@@ -10,21 +10,53 @@ the plain-text `TODO` file. It has two parts: the caveats that apply to every fi
 and table in `2_make_DART_results.Rmd`, and the outstanding analysis and reporting
 tasks, grouped by theme rather than by the order in which they were written down.
 
-**Review status.** Every task below has been checked against `2_make_DART_results.Rmd`
-as it currently stands (716 lines). Items that the current results address adequately
-are ~~struck through~~ and followed by an italic *Addressed:* note giving the line
-range and the chunk label where the work lives. Items that are only partially covered
-carry a *Partly addressed:* note saying what exists and what is still missing, and
-items with no coverage carry an *Outstanding:* note. A few items resolved by a
-decision to **not** do the work are struck as well, with the note recording where
-that decision is documented. Line numbers refer to `2_make_DART_results.Rmd` and will
-drift as that file is edited.
+**Review status.** Every task below has been checked against the results document as it
+currently stands. Items that the current results address adequately are ~~struck
+through~~ and followed by an italic *Addressed:* note saying where the work lives.
+Items that are only partially covered carry a *Partly addressed:* note saying what
+exists and what is still missing, and items with no coverage carry an *Outstanding:*
+note. A few items resolved by a decision to **not** do the work are struck as well,
+with the note recording where that decision is documented.
 
-Of the 20 task entries, 12 are struck in full, along with the last of the four
-collaborator sub-questions; 3 are partly addressed, 4 are outstanding, and 1 (the
-de-prioritisation of publication graphics) is a standing priority note rather than a
-task. The four fully outstanding items are the model `.Rmd` split, time metrics in the
-summary table, a stability-over-time metric, and a late-year sample-size cut-off.
+**How locations are cited.** The earlier version of this list gave line numbers in a
+single 716-line `2_make_DART_results.Rmd`. That file no longer exists in that form: the
+report has been split into a driver (`2_make_DART_results.Rmd` - setup, constants, the
+cross-objective compilation chunks and the hand-written interpretation) and a template
+(`_objective_block.Rmd`), which the driver's `objective_blocks` chunk expands once per
+element of `summaries` with `knit_expand()` and renders with `knit_child()`. A line
+number is therefore no longer a unique location - the template's lines are rendered
+once per objective - so every note below cites a **file and chunk label** instead.
+Template chunk labels come out as `results-X_Y`, where `X` is the objective's index and
+`Y` counts chunks within that objective's block from 0; a note that says
+`_objective_block.Rmd`, chunk `results-X_18` means that chunk in every objective's
+section. Chunk labels are stable under editing in a way line numbers are not.
+
+The report now covers **five** objective x cover response combinations, not one:
+`decrease_afg` (AFG), `decrease_shr` (SHR), `decrease_tre` (TRE), `increase_pfg` (PFG)
+and `increase_shr` (SHR). Several notes below have been rewritten because a task that
+was previously only drafted for `decrease_afg` now runs for all five.
+
+Of the 22 task entries, 15 are struck in full, along with all four of the collaborator
+sub-questions; 2 are partly addressed, 4 are outstanding, and 1 (the de-prioritisation
+of publication graphics) is a standing priority note rather than a task. The four fully
+outstanding items are the model `.Rmd` split, time metrics in the summary table, a
+stability-over-time metric, and re-checking the written interpretations against the
+figures that were reoriented from raw-positive to intended in this revision.
+
+**Closed since the last revision of this list.** The largest one is the **late-year
+sample-size cut-off**, which had been the longest-standing outstanding item and is now
+implemented as `min_year_n` plus `truncate_late_years()`; its item below records what it
+removed. Alongside it: the three per-section `summarize_sig_effect()` figures now report
+the **intended** effect rather than the raw positive one; a **depopulated-level** filter
+was added so a treatment or ecoregion thinned across surviving cells can be dropped
+rather than only reported; the compiled summary table is now also written in the
+reporting spreadsheet's **column order** via `summary_template_map()`; the
+significantly-shifting **heatmap** was removed from each section; the hand-written
+**interpretation section moved to the end** of the report; and the polygon-count
+histogram's axis was fixed (it had been requesting one break per integer, rendering 39
+labels as a run of digits). The weighting question is settled and struck. The
+"Polygon count by year since treatment" figure was checked against an independent
+recount of distinct polygon x year pairs and is correct as drawn.
 
 ## Caveats and considerations
 
@@ -37,9 +69,10 @@ should be restated wherever those results are presented.
   once, and substantial parts of the dataset are counted more than once across the
   figures and tables. Counts and percentages should be read as per-objective summaries,
   not as a partition of the dataset. *This caveat is now quantified rather than just
-  stated: the co-occurrence table in chunk `results-1_22` (lines 555-602) reports how
-  many of the current objective's pixels carried no second objective, and how many
-  carried each of the others.*
+  stated: the co-occurrence table in `_objective_block.Rmd`, chunk `results-X_22` reports
+  how many of that objective's pixels carried no second objective and how many carried
+  each of the others, and the driver's `compile_overlap` chunk stacks all five
+  objectives' versions into one table.*
 - **Objective/response pairings are restricted.** An objective/response combination is
   only included if the response variable is the same cover type as the objective's
   target cover (for example, `decrease_afg` paired with the differenced AFG response).
@@ -50,17 +83,71 @@ should be restated wherever those results are presented.
 
 - **Fill out `table_restoredart_template.xlsx`.** This is the summary table requested
   by email and is the primary near-term deliverable.
-  *Partly addressed: chunk `summary_table` (lines 659-714) assembles the table with the
-  requested column set - objective and treatment share columns, ecoregion, pixel and
-  polygon counts, and intended/unintended significant-pixel counts and percentages.
-  Still missing: the table is drafted for `decrease_afg` only (noted at line 716), and
-  nothing writes it out to the `.xlsx` template.*
+  *Partly addressed, and now one manual step from done. The table is built per objective
+  in `_objective_block.Rmd`, chunk `results-X_23`, with the requested column set -
+  objective and treatment share columns, ecoregion, pixel and polygon counts, and
+  intended/unintended significant-pixel counts and percentages - stacked across all five
+  objectives by `collect_obj_tables('summary_tbl_')` in the driver's `compile_tables`
+  chunk, rendered in `summary_table`, and written out by `write_csv` as
+  `2_DART_results_summary_table.csv`.*
+
+  *The column mapping that was the remaining step now exists.
+  `summary_template_map()` in `helper_functions.R` maps the compiled columns onto the
+  template's headers, copied verbatim from row 1 of `table_restoredart_template.xlsx`
+  (including its "desired"/"undesired" wording, which is that spreadsheet's vocabulary
+  for what this report calls intended/unintended - kept rather than corrected, since the
+  point of a mapping is that the spreadsheet stays as the collaborators expect it).
+  `map_summary_to_template()` applies it, and `write_csv` emits
+  `2_DART_results_summary_table_template.csv` in the template's column order, ready to
+  paste under row 1. Compiled columns the template does not ask for
+  (`n_time_objective`, `n_time_treatment`, `pct_time_treatment`) are appended after the
+  mapped ones under their own names rather than dropped.*
+
+  *Two entries in the mapping are guesses and are the things to check by hand. The
+  template's first header reads "% or # of time this was the objective" and the compiled
+  table has both forms, so `pct_time_objective` is used - swap in `n_time_objective` for
+  the count. And column H of the template has **no header at all**; it is mapped to the
+  overall significant-pixel count (`grp_n_sig`) on the strength of sitting between
+  "Number polygons" and "# of pixels Significant & desired". If H was meant for
+  something else, that is the entry to change.*
+
+  *What is still missing is only the write into the workbook itself: nothing produces an
+  `.xlsx`. That needs `openxlsx` or `writexl`, neither of which is installed and neither
+  of which this report currently depends on, so it was left as a .csv rather than adding
+  a dependency without asking. Pasting one column block into the template by hand is the
+  alternative, and with the columns already in the template's order that is a single
+  paste.*
 - **Split the models into their own `.Rmd`.** The model fitting and the results
   summaries are too much material for a single document; move the model code and
   model diagnostics into a separate `.Rmd` so that each document has one purpose.
   *Outstanding: no model code has been moved out of this document. The weighting
-  analysis has already been split off into `weight_testing_summary.Rmd` (referenced at
-  line 350), which is the precedent to follow for the models.*
+  analysis has already been split off into `weight_testing_summary.Rmd` (referenced in
+  the prose above chunk `results-X_18` of `_objective_block.Rmd`), which is the
+  precedent to follow for the models. Note that the driver/template split has since
+  established a second precedent for dividing this report up, and the two are
+  different: `weight_testing_summary.Rmd` is a separate document with its own output,
+  whereas `_objective_block.Rmd` is a child template with no YAML header, rendered into
+  the parent. The models want the first pattern, not the second.*
+- ~~**Weighting the time series.**~~ *Settled: weighting the time-series summaries was
+  checked and determined not to be helpful, so nothing in the report is weighted. The
+  analysis behind that decision is in `weight_testing_summary.Rmd`.*
+- **Re-check the written interpretations against the reoriented figures.** The three
+  per-section `summarize_sig_effect()` figures (by fine objective, by treatment, by
+  ecoregion) now report the *intended* effect rather than the raw positive one, and for a
+  `decrease_*` objective that is a different quantity, not a relabelling.
+  *Outstanding, and newly introduced by this revision. The reordering is substantial
+  rather than cosmetic: for `decrease_afg` by ecoregion, the Spearman rank correlation
+  between the old raw-positive ordering and the new intended ordering is **-0.234** -
+  effectively unrelated, and slightly negative. `Uinta Basin Floor` ranks 1st of 18 under
+  intended (22.45%) but 13th under raw positive (6.74%), while `Sagebrush Basins and
+  Slopes` moves the other way (15.92% positive, 8.81% intended). The bullets under
+  *Interpretation → By objective × cover response* refer to these figures, including the
+  `Uinta Basin Floor` remark, which was written when a differently-defined figure was on
+  the page. Each of them needs re-reading against the figure as it now stands before the
+  interpretations are circulated. Note also that the per-section percentages are now
+  comparable only within a section - the compiled tables still use the raw sign, so a
+  per-section and a compiled figure for the same objective are no longer the same
+  quantity and for a `decrease_*` objective are close to complements.*
 - **De-prioritise final publication graphics.** Figures intended for publication, and
   the polishing that goes with them, are explicitly lower priority than getting the
   summary tables and time-effect results settled. *Standing priority note rather than a
@@ -71,41 +158,56 @@ should be restated wherever those results are presented.
 - ~~**Drop the `increase_afg` and `increase_tre` objectives** from this round of
   results. Neither is in scope, and both should be excluded before any summarising
   happens.~~
-  *Addressed: chunk `setup`, lines 26-32. The `subset()` on the `summaries` list drops
+  *Addressed: driver, chunk `setup`. The `subset()` on the `summaries` list drops
   `^increase_afg_` and `^increase_tre_` (along with the `null_afg` control) immediately
   after `split_by_objective()`, so the exclusion applies before anything downstream is
-  computed. The comment block at lines 26-28 records why each is dropped.*
+  computed, and the comment above it records why each is dropped. The five combinations
+  that survive are `decrease_afg` (AFG), `decrease_shr` (SHR), `decrease_tre` (TRE),
+  `increase_pfg` (PFG) and `increase_shr` (SHR). Note that this is the only place the
+  exclusion happens - `combined_df` is kept unsubsetted, and the cross-objective
+  direction checks read from it, so the dropped objectives' pixels can still enter those
+  three tables as co-occurring objectives on a retained pixel.*
 
 ## Summary table contents
 
 - ~~**Define the "% or # of times this was the objective" column.** Using the table
   headers from the email: out of all polygons presently under consideration, what
   percentage (and what raw count) had this objective assigned to them?~~
-  *Addressed: chunk `summary_table`, lines 660-674. The denominator is the total polygon
-  count summed across every element of `summaries` (i.e. every objective × cover
-  combination currently in the report), and the numerator is this objective's own
-  polygon count; both the count and the percentage are carried into the rendered table
-  at lines 692-697. The header comment at lines 660-666 documents the definition,
-  including the name-stripping needed to tally by objective rather than by
-  objective × cover.*
+  *Addressed: the denominator is built once in the driver's `objective_inventory` chunk
+  as the total polygon count summed across every element of `summaries` (i.e. every
+  objective × cover combination currently in the report), and the numerator is this
+  objective's own polygon count; `_objective_block.Rmd`, chunk `results-X_23` divides
+  them and carries both the count and the percentage into the table. Building the
+  inventory in the driver rather than in the template is deliberate - it means the
+  denominator is the same for every objective regardless of the order the sections
+  render in. The header comments in both chunks document the definition, including the
+  name-stripping needed to tally by objective rather than by objective × cover.*
 - ~~**Add a table of overlapping objectives.** For the objective currently under
   consideration, how often does each of the other objectives co-occur with it? This
   quantifies the multiple-counting caveat above and tells us how much of each
   objective's sample is shared with the others.~~
-  *Addressed: chunk `results-1_22`, lines 555-602, with the compiled cross-objective
-  version in chunk `compile_tables` (lines 626-655, `overlap_tbl_all`). The table gives
-  a pixel count and percentage for each co-occurring objective, and its caption reports
-  how many pixels had no second objective at all. The prose at lines 551-553 is
-  explicit that these percentages are of the pixels used in this objective's own
-  filtered analysis, not of the full `combined_df`.*
+  *Addressed: `_objective_block.Rmd`, chunk `results-X_22` (`objective_overlap_table()`
+  in `helper_functions.R`), with the compiled cross-objective version gathered as
+  `overlap_tbl_all` in the driver's `compile_tables` chunk and rendered in
+  `compile_overlap`. The table gives a pixel count and percentage for each co-occurring
+  objective, and the pixels that carried no second objective are an explicit `none` row
+  rather than a caption - deliberately, so that the solo share reads off the same column
+  as the co-occurrence shares and survives being `rbind()`-ed across objectives. The
+  prose is explicit that these percentages are of the pixels used in this objective's
+  own post-filter analysis, not of the full `combined_df`.*
 - **Add time metrics to the summary table** if they can be expressed compactly enough
   to fit alongside the existing columns (see the time-effect tasks below for the
   candidate metrics).
-  *Outstanding: the time metrics now exist (year bins in chunk `results-1_19`,
-  per-polygon peak years in chunk `results-1_20`), but none of them are joined into
-  `summary_table` (lines 659-714), which is still purely cross-sectional. The candidate
-  columns would be the mean year of peak significance and its percent censored, already
-  computed per treatment at lines 507-518.*
+  *Outstanding: the time metrics now exist (year bins in `_objective_block.Rmd`, chunk
+  `results-X_20`; per-polygon peak years in chunk `results-X_21`; the mean-effect peak
+  per direction in chunk `results-X_19`), but none of them are joined into the summary
+  table built in chunk `results-X_23`, which is still purely cross-sectional. The
+  candidate columns remain the mean year of peak significance and its percent censored,
+  already computed per treatment as `time_summary_by_tx` in chunk `results-X_21`. Note
+  that joining them in means choosing a grain: the summary table is one row per
+  objective × cover × treatment × ecoregion, whereas `time_summary_by_tx` is per
+  treatment only, so either the timing summary has to be recomputed at the finer grain
+  or the same timing value gets repeated down each treatment's rows.*
 
 ## Time effects
 
@@ -117,171 +219,294 @@ that timing given the available sample.
   ecoregion and treatment.** At minimum this is needed for visualisation, so that the
   time dimension can be read off a figure the same way the ecoregion and treatment
   dimensions can.~~
-  *Addressed: chunk `results-1_17`, lines 352-400. `sig_by_year` tabulates percent
-  significant, percent significant positive and percent significant negative for each
-  year since treatment, and `plot_sig_direction_stacked()` draws the same three
-  quantities as a stacked bar per year with sample-size labels. The by-treatment and
-  by-ecoregion versions of the timing summary follow in chunk `results-1_20`
-  (lines 507-533).*
+  *Addressed: `_objective_block.Rmd`, chunk `results-X_18`. `sig_by_year` tabulates
+  percent significant, percent significant positive and percent significant negative for
+  each year since treatment, and `plot_sig_direction_stacked()` draws the same three
+  quantities as a stacked bar per year with two levels of sample-size label (the group
+  total above the bar, the per-direction significant counts inside each segment). The
+  by-treatment and by-ecoregion versions of the timing summary follow in chunk
+  `results-X_21`.*
 - ~~**Decide whether to bin time.** Binning would stabilise the per-year estimates at
   the cost of temporal resolution; 5-, 10- and 15+-year bins are the obvious starting
   point. This needs a decision rather than being left implicit.~~
-  *Addressed - decided in favour of binning, in addition to the per-year table: chunk
-  `results-1_19`, lines 452-480. `cut()` at line 454 defines the 1-5, 6-10, 11-15 and
+  *Addressed - decided in favour of binning, in addition to the per-year table:
+  `_objective_block.Rmd`, chunk `results-X_20`. `cut()` defines the 1-5, 6-10, 11-15 and
   16+ bins and `sig_by_bin` reports total pixels and mean percent significant (overall
   and by direction) within each bin, tagged with objective and cover so it can be bound
-  across objectives.*
+  across objectives. The bound version is now also drawn as a figure:
+  `plot_sig_by_bin_summary()` (`plot_functions.R`), in the driver's
+  `compile_sig_by_bin_plot` chunk, stacks the two directional rates per bin with one
+  panel per objective × cover response. That figure fixes the stacking order rather than
+  putting the intended direction against the axis the way the per-objective per-year
+  figure does, because intent differs between panels - the panel strip names the
+  objective and the fill carries the raw sign only.*
 - ~~**Identify the year at which treatment was most and least effective**, where
   effectiveness is quantified as the percentage of significant DART pixels.~~
-  *Addressed: chunk `results-1_17`, lines 380-386, with the result written out as prose
-  at lines 398-399. Both the year and its percent significant are pulled from
-  `sig_by_year` with inline R rather than typed in, so they cannot drift from the table
-  immediately above them.*
+  *Addressed: `_objective_block.Rmd`, chunk `results-X_18`, with the result written out
+  as prose immediately below it. Both the year and its percent significant are pulled
+  from `sig_by_year` with inline R rather than typed in, so they cannot drift from the
+  figure and table above them.*
 - ~~**Summarise per-polygon timing, then aggregate across polygons.** Compute the mean,
   minimum, maximum and standard deviation of the percentage of significant pixels,
   along with the 5/10/15+-year bins, and answer the question "how far in time was the
   treatment most significant?". Doing this within each polygon first should mitigate
   the sample size problems that arise when years are pooled across polygons.~~
-  *Addressed: chunk `results-1_20`, lines 482-533. `poly_year_sig` computes percent
-  significant per polygon × year, `poly_best_worst` reduces each polygon to its
+  *Addressed: `_objective_block.Rmd`, chunk `results-X_21`. `poly_year_sig` computes
+  percent significant per polygon × year, `poly_best_worst` reduces each polygon to its
   highest- and lowest-significance year, and `time_summary_by_tx` /
   `time_summary_by_eco` aggregate those per-polygon peak years across polygons with N,
   mean, SD, min and max, reported separately by treatment and by ecoregion. The header
-  comment at lines 483-488 records that this is a hard per-polygon peak, unweighted and
-  unsmoothed. SD is blanked rather than printed as `NA` for single-polygon groups
-  (lines 534-543). The year bins requested in the same item are in chunk `results-1_19`.*
+  comment records that this is a hard per-polygon peak, unweighted and unsmoothed. SD is
+  blanked rather than printed as `NA` for single-polygon groups, via
+  `options(knitr.kable.NA = '')` set around those two `kable()` calls only. The year
+  bins requested in the same item are in chunk `results-X_20`.*
   - ~~**Caveat: censoring.** A polygon whose maximum or minimum effect falls at the end
     of its available time series is censored, and its true peak may lie beyond the
     observation window. This needs to be flagged, and ideally quantified as the number
     of polygons whose extremum occurs in the final year.~~
-    *Addressed: chunk `results-1_20`, lines 502-503 flag `is_censored_max` and
-    `is_censored_min` per polygon, and lines 516 and 528 report `pct_censored_max` -
-    the percentage of polygons whose peak lands on their last observed year - in both
-    the by-treatment and by-ecoregion tables. The same flag is carried for the
-    mean-effect peak in chunk `results-1_18b` (`peak_effect_year()`, lines 405-430) and
-    surfaced in the peak-effect prose bullets. The interpretation is written out at
-    line 545.*
+    *Addressed: `_objective_block.Rmd`, chunk `results-X_21` flags `is_censored_max` and
+    `is_censored_min` per polygon and reports `pct_censored_max` - the percentage of
+    polygons whose peak lands on their last observed year - in both the by-treatment and
+    by-ecoregion tables. The same flag is carried for the mean-effect peak by
+    `peak_effect_year()` in chunk `results-X_19` and surfaced in that section's prose
+    bullets. It is now also drawn: `plot_peak_effect_summary()` (`plot_functions.R`), in
+    the driver's `compile_peak_effect_plot` chunk, maps the flag to point shape, so a
+    censored peak is visibly distinct from one that fell inside the record rather than
+    being distinguishable only by reading the table column. The interpretation is written
+    out under the *Time since treatment* heading of the driver's hand-written section.*
 - ~~**Define what a "non-significant" time effect is.** One option is to inverse-weight
   the time-series summary statistics by the overall magnitude of significance within
   that time series, so that polygons with weak or noisy signals contribute less to the
   aggregate timing estimate. If that is done, decide whether the variance metrics
   (standard deviation, standard error) can and should be weighted the same way.~~
-  *Addressed - resolved by deciding against weighting. Line 350 states that no
-  weighting is used anywhere in the time section, that weighting schemes were tested,
-  and that they did not improve the results, with the analysis itself in
-  `weight_testing_summary.Rmd`. Lines 547-549 record the removal of the
-  significance-weighted peak-year summaries and their helper functions
-  (`weighted_peak_year()`, `plot_weighted_peak_heatmap()`), on the grounds that a
-  fractional "centre of mass" year is not interpretable in the response's own units and
-  silently blends the two effect directions. The unweighted mean-effect-by-year table
-  and figure in chunk `results-1_18b` (lines 405-450) answer the underlying question
-  instead.*
+  *Addressed - resolved by deciding against weighting. The prose above chunk
+  `results-X_18` of `_objective_block.Rmd` states that no weighting is used anywhere in
+  the time section, that weighting schemes were tested, and that they did not improve
+  the results, with the analysis itself in `weight_testing_summary.Rmd`. The unweighted
+  mean-effect-by-year table and figure in chunk `results-X_19`
+  (`mean_effect_by_year()` / `peak_effect_year()` / `plot_mean_effect_year()`) answer the
+  underlying question instead: non-significant pixels are excluded outright rather than
+  folded in as zeros, and the two directions are never averaged together. The weighted
+  helpers that used to sit here (`weighted_peak_year()`, `plot_weighted_peak_heatmap()`)
+  are gone; see the *Weighting the time series* item under *Reporting and document
+  structure* for the settled decision.*
   - ~~Mean time to maximum treatment effect, weighted by the magnitude of the effect,
     per polygon on the y axis, against treatment or ecoregion on the x axis.~~
   - ~~A heatmap with treatment and ecoregion on the x and y axes and mean time to
     maximum significance as the fill.~~
-    *Both superseded by the same decision: these were the weighted figures removed at
-    lines 547-549. Their unweighted replacements are the per-treatment and
-    per-ecoregion peak-year tables in chunk `results-1_20` (lines 507-533).*
+    *Both superseded by the same decision: these were the weighted figures that were
+    removed. Their unweighted replacements are the per-treatment and per-ecoregion
+    peak-year tables in `_objective_block.Rmd`, chunk `results-X_21`, and - newly, at
+    the cross-objective level - `plot_peak_effect_summary()` in the driver's
+    `compile_peak_effect_plot` chunk, which puts peak year on the x axis and mean effect
+    at the peak on the y axis with one panel per objective × cover response. That is the
+    closest unweighted analogue of the requested heatmap: it keeps the timing on an axis
+    rather than in a fill, and it reports the mean effect in the response's own units
+    instead of a fractional centre-of-mass year.*
 - ~~**Quantify how much polygon-level variability the weighting scheme discards.** We
   need results that describe how poorly the polygons capture variability in effects
   through time - concretely, how many polygons are effectively ignored once a
   weighting scheme is applied.~~
-  *Addressed - and partly moot, since no weighting scheme survives (line 350), so no
-  polygons are being down-weighted out of the summaries. The underlying question of how
-  variable the timing is between polygons is answered directly and unweighted in chunk
-  `results-1_20`: the SD, min and max of the per-polygon peak year (lines 507-533) show
-  the spread across polygons within each treatment and ecoregion, and `pct_censored_max`
-  says what share of polygons cannot be placed at all because their peak is censored.*
+  *Addressed - and partly moot, since no weighting scheme survives, so no polygons are
+  being down-weighted out of the summaries. The underlying question of how variable the
+  timing is between polygons is answered directly and unweighted in
+  `_objective_block.Rmd`, chunk `results-X_21`: the SD, min and max of the per-polygon
+  peak year show the spread across polygons within each treatment and ecoregion, and
+  `pct_censored_max` says what share of polygons cannot be placed at all because their
+  peak is censored.*
 - **Quantify stability over time.** Whether an effect, once significant, stays
   significant is a separate question from when it first appears, and needs its own
   metric.
   *Outstanding: no persistence or stability metric is computed. The per-polygon work in
-  chunk `results-1_20` (lines 482-506) identifies each polygon's single best and worst
-  year but says nothing about runs of consecutive significant years, and line 545 flags
-  the stable-state-change discussion as a consequence of censoring without measuring it.
-  `poly_year_sig` (lines 489-497) is already at the polygon × year grain a run-length or
-  autocorrelation metric would need.*
+  `_objective_block.Rmd`, chunk `results-X_21` identifies each polygon's single best and
+  worst year but says nothing about runs of consecutive significant years, and the
+  *Time since treatment* interpretation in the driver flags the stable-state-change
+  discussion as a consequence of censoring without measuring it. `poly_year_sig` in that
+  same chunk is already at the polygon × year grain a run-length or autocorrelation
+  metric would need. The new binned figure (`compile_sig_by_bin_plot`) is the nearest
+  thing currently in the report - a rate that holds up across the 1-5, 6-10, 11-15 and
+  16+ bins is suggestive of persistence - but it is an aggregate over pixels, so it
+  cannot distinguish one pixel significant in every year from four pixels each
+  significant in one.*
 - ~~**Add uncertainty around the significant-pixel percentages.** The standard error or
   standard deviation around the count of statistically significant pixels can be
   reported for overall significance by computing it across polygons, treating each
   polygon as the unit of replication.~~
-  *Addressed: chunk `results-1_12b`, lines 203-226. `summarize_poly_sig()` collapses to
-  one percent-significant value per polygon and then reports the mean, SD and SE of
-  that per-polygon rate, separately for the overall, significant-positive and
-  significant-negative rates. The rationale - that pixels within a polygon are
-  spatially correlated and so are not independent observations - is stated at line 201,
-  and the same three metrics are drawn with ± 1 SE ranges in chunk `results-1_12c`
-  (lines 228-236).*
+  *Addressed, and it moved during the restructure: this is now a cross-objective table
+  rather than a per-objective one. `summarize_poly_sig()` (`helper_functions.R`)
+  collapses to one percent-significant value per polygon and reports the mean, SD and SE
+  of that per-polygon rate, separately for the overall, significant-positive and
+  significant-negative rates; the driver's `compile_tables` chunk calls it once per
+  element of `summaries_mod` to build `poly_sig_all`, rendered in `compile_poly_sig` and
+  drawn with ± 1 SE ranges by `plot_poly_sig_summary(metric = 'all')` in
+  `compile_poly_sig_plot`. It is computed in the driver rather than stored per objective
+  by the template - the one compiled table with no per-objective copy - because the table
+  and figure are only meaningful with every objective on them. The rationale, that the
+  data is averaged twice (once at the polygon level, once at the objective level) and so
+  says how variable the overall rate is across polygons, is stated in the prose above
+  the table.*
 
 ## Spatial analogue
 
 - ~~**Ask whether the same treatment can be repeated for space** rather than time, and
   whether the result is informative or just a "boring boxplot". If the spatial version
   adds nothing beyond what the ecoregion groupings already show, say so and drop it.~~
-  *Addressed: the spatial versions exist in three places. Chunk `results-1_15`
-  (lines 300-314) gives percent significant positive by ecoregion with its figure, with
-  pairwise testing deliberately switched off because there are too many ecoregions for
-  it to help (stated at line 316). Chunk `results-1_16` (lines 322-340) loops over
-  ecoregions to draw the DART-through-time figure within each one. Chunk `results-1_20`
-  (lines 520-533) is the direct spatial analogue of the time summary - mean, SD, min,
-  max and percent censored of the per-polygon peak year, by ecoregion. Note that the
-  document does not record a verdict on the "is this just a boring boxplot" question;
-  if the ecoregion breakdown is to be dropped, that reasoning still needs writing down.*
+  *Addressed: the spatial versions exist in three places, all in `_objective_block.Rmd`.
+  Chunk `results-X_16` gives percent significant **intended** by ecoregion with its
+  figure (it reported percent significant *positive* until this revision - see the
+  intended-effect change noted at the top of this list), with pairwise testing
+  deliberately switched off because there are too many ecoregions for it to help. Chunk
+  `results-X_17` loops over ecoregions to draw the DART-through-time bar panels within
+  each one. Chunk `results-X_21` is the direct spatial analogue of the time summary -
+  mean, SD, min, max and percent censored of the per-polygon peak year, by ecoregion.*
+
+  *A partial verdict has now been reached, though not on the ecoregion breakdown as a
+  whole. The year × treatment × ecoregion heatmap that used to open chunk `results-X_17`
+  has been **removed**: with five objectives and up to 28 ecoregions each it was one
+  dense panel grid per objective, and the bar panels below it carry the same information
+  on axes that can be read off directly. That reasoning is written into the report at the
+  point of removal, per the project's convention that a removed analysis is explained
+  rather than deleted silently, and `plot_all_DART_sig()` remains in `plot_functions.R`
+  so the figure can be restored by putting back a single call.*
+
+  *The "is this just a boring boxplot" question is still unanswered for the per-ecoregion
+  loop itself, which remains the largest single contributor to render time and document
+  size - one bar-panel figure per ecoregion per objective, across 18, 10, 15, 28 and 27
+  ecoregions. If that breakdown is to be dropped or thinned, the reasoning still needs
+  writing down.*
 
 ## Sample size and polygon standardisation
 
 - **Standardise polygons on the basis of their time series.** Check that a small number
   of polygons with unusually long records are not extending the overall time series and
   dominating the visualisations.
-  *Partly addressed: the diagnostic exists but no standardisation is applied. Chunk
-  `results-1_11b` (lines 183-185) plots, for each year since treatment, how many
-  distinct polygons contribute at least one pixel, which is where a thinning tail would
-  show up; `poly_best_worst` also records `n_years` per polygon (line 499). What is
-  missing is any action taken on that diagnostic - no polygon is trimmed or reweighted
-  on the basis of record length, and the per-year figures still run to the full extent
-  of the longest-record polygons.*
-- **Consider a sample size cut-off for polygons after a given year**, so that years
-  supported by only a handful of polygons are not plotted or summarised as though they
-  were as well supported as the early years.
-  *Outstanding: the only sample-size cut-off in the document is the `min_txeco_n <- 300`
-  pixel threshold on treatment × ecoregion combinations (line 47, applied in chunks
-  `results-1_4` and `results-1_6`), which is cross-sectional and does nothing about
-  sparsely supported late years. A year-based or polygon-count-based threshold would
-  attach to `sig_by_year` (lines 352-366) and to the per-year figures.*
+  *Partly addressed, and further along than at the last revision. The diagnostic is in
+  `_objective_block.Rmd`, chunk `results-X_11`, which plots for each year since treatment
+  how many distinct polygons contribute at least one pixel - that figure has been checked
+  against an independent recount of distinct polygon x year pairs and is correct as drawn
+  (it peaks at each objective's true polygon total and declines monotonically).
+  `poly_best_worst` in chunk `results-X_21` also records `n_years` per polygon.*
 
-  *Evidence, September 2026, from the first run of the pipeline against the full input
-  file (9,094,508 rows): for `decrease_afg` / AFG, `peak_effect_year()` reports the peak
-  **positive** effect as +28.78 (SE 3.53) at year 25, computed from **10 significant
-  pixels**, and the peak **negative** effect as -43.26 (SE 1.79) at year 18 from 132.
-  Significant-pixel counts for that objective fall from 2,025 positive / 616 negative in
-  year 1 to 10 / 15 by year 25. Both dashed peak lines drawn by
-  `plot_mean_effect_year()` therefore sit in the part of the series where n is in the
-  tens, and the jagged tail beyond roughly year 18 is small-n scatter presented with the
-  same visual weight as the well-supported early years. The `is_censored` flag does not
-  catch this: it fires only when the peak falls on the last observed year, not when it
-  falls on a sparse interior one. Note also that the precedent for a small-n guard
-  already exists elsewhere in the report - the year x treatment x ecoregion heatmap fades
-  tiles built on fewer than 30 pixels (`_objective_block.Rmd`, figure note at line 346) -
-  but `mean_effect_by_year()`, `peak_effect_year()` and the mean-effect figure have no
-  equivalent. The narrowest fix that would change the reported numbers is a minimum
-  significant-pixel count per year x direction cell (n = 100 would truncate this
-  objective at about year 18), applied inside `mean_effect_by_year()` so that the peak
-  table, the peak lines and the figure cannot disagree, with the dropped years still
-  reported somewhere so the truncation is visible rather than silent. Whether the
-  threshold should be a pixel count, a polygon count, or both is the open question.*
+  *Action is now taken on the diagnostic at the SERIES level: the late-year truncation
+  above cuts the record where the per-year sample size gives out, so the per-year figures
+  no longer run to the full extent of the longest-record polygons regardless of how few
+  remain. What is still missing is action at the POLYGON level - no individual polygon is
+  trimmed or reweighted on the basis of its own record length, so a handful of
+  long-record polygons can still be the only contributors to the last retained years.
+  The five objectives' records also remain of unequal length (28, 33, 33, 33 and 30
+  post-treatment years before truncation, 26 and 32 after it for the two truncated
+  objectives), so the x axis of the cross-objective peak figure spans a different amount
+  of data in each panel.*
+- ~~**Consider a sample size cut-off for polygons after a given year**, so that years
+  supported by only a handful of polygons are not plotted or summarised as though they
+  were as well supported as the early years.~~
+  *Addressed. `min_year_n` is set in the driver's `setup` chunk, keyed per objective
+  exactly like `min_txeco_n` (both now resolve through the same `keyed_threshold()`), and
+  applied by `truncate_late_years()` in `_objective_block.Rmd`, chunk `results-X_6`. It
+  **truncates** rather than excluding individual years: the first year below the
+  threshold is found and that year plus every year after it is dropped, whether or not a
+  later year clears the threshold again. That is the right shape for this data because
+  the per-year sample size falls monotonically as polygons leave the post-treatment
+  record, so a failing year marks where the record stops supporting a comparison and a
+  later year that clears it is a blip inside an already-unreliable tail.*
+
+  *The filter runs last of the three, after both spatial filters, so the per-year counts
+  it tests are the ones the figures are actually drawn from. Its effect is recorded per
+  objective in the `compile_filter_log` table (`Min. … Pixels per Year`, `Truncated From
+  Year`, `# Years Dropped`), and each section states in prose where its own series was
+  cut, so the truncation is visible rather than silent - which was the condition attached
+  to this item.*
+
+  *What it removes at the current setting (`min_year_n = c(default = 10)`,
+  `year_trunc_metric = 'significant'`): `decrease_afg` is cut at year 27, losing 2 years
+  and 0.10% of its pixels, so its series ends at 26; `decrease_shr` is cut at year 33,
+  losing 1 year and 0.06%; `decrease_tre`, `increase_pfg` and `increase_shr` are not
+  truncated at all. Modest, and deliberately so - see the open question below.*
+
+  *One thing this item's earlier evidence got wrong, worth recording because it
+  determines whether the filter does anything: the threshold cannot usefully be a
+  **total**-pixel count. The per-year totals stay in the hundreds to the end of every
+  objective's record (the smallest is 44 pixels, `decrease_afg` years 27-28), so any
+  small total-pixel threshold truncates nothing. `year_trunc_metric` therefore defaults
+  to `'significant'` - significant pixels in that year - which is the quantity the
+  problem is about, since `mean_effect_by_year()` and `peak_effect_year()` average over
+  significant pixels only. Setting it to `'pixels'` gives the exact analogue of
+  `min_txeco_n` and, at any threshold near 10, does nothing.*
+
+  *Still open, and now a narrower question than before: the threshold **value**. At 10
+  significant pixels the filter removes the years where almost nothing was significant
+  but leaves the small-n peaks that motivated the item - `decrease_shr`'s positive peak
+  rested on a single significant pixel at year 27, which survives a per-year threshold of
+  10 because that year had enough significant pixels in total across both directions. A
+  threshold in the low hundreds would remove most of the small-n peaks, at the cost of
+  cutting several objectives back by a decade or more. That is a judgement about how much
+  record to give up, not a defect, and it is a one-line edit to `min_year_n` now that the
+  mechanism exists. A per-year **x direction** threshold inside `mean_effect_by_year()`
+  would be the sharper instrument if the peaks specifically are the concern.*
+
+  *Evidence, September 2026, from runs of the pipeline against the full input file
+  (9,094,508 rows). The problem is now visible across all five objectives rather than
+  inferred from one. `peak_effect_year()` reports these peaks:*
+
+  | Objective (cover) | Direction | Peak year | Mean effect | SE | n sig. pixels | Last year |
+  |---|---|---|---|---|---|---|
+  | `decrease_afg` (AFG) | negative | 18 | -43.26 | 1.79 | 132 | 26 |
+  | `decrease_afg` (AFG) | positive | 25 | +28.78 | 3.53 | **10** | 26 |
+  | `decrease_shr` (SHR) | negative | 1 | -21.51 | 0.26 | 2,487 | 33 |
+  | `decrease_shr` (SHR) | positive | 27 | +14.20 | - | **1** | 33 |
+  | `decrease_tre` (TRE) | negative | 29 | -26.64 | 1.02 | 100 | 33 |
+  | `decrease_tre` (TRE) | positive | 31 | +14.24 | 1.26 | **27** | 33 |
+  | `increase_pfg` (PFG) | negative | 21 | -10.59 | 0.15 | 733 | 33 |
+  | `increase_pfg` (PFG) | positive | 33 | +23.43 | 2.36 | **17** | 33 (censored) |
+  | `increase_shr` (SHR) | negative | 2 | -11.94 | 0.11 | 3,034 | 30 |
+  | `increase_shr` (SHR) | positive | 20 | +14.01 | 0.34 | 378 | 30 |
+
+  *Seven of the ten reported peaks rest on fewer than 800 significant pixels and four on
+  fewer than 30, against bins of 12,000 to 190,000 pixels elsewhere in the same
+  objectives. The `decrease_shr` positive peak is the limiting case: a single significant
+  pixel, so its SE is undefined and blank above. Every one of these small-n peaks is a
+  positive (unintended) peak under a `decrease_*` objective or lands late in the record,
+  which is exactly where the significant-pixel count has thinned. The `is_censored` flag
+  catches only one of them - `increase_pfg` at year 33 - because it fires when the peak
+  falls on the last observed year, not when it falls on a sparse interior one.*
+
+  *Two things have changed since that evidence was written. First, the shortfall became
+  legible rather than buried: `plot_peak_effect_summary()` prints the significant-pixel
+  count beside every point, so a peak backed by one pixel is visibly different from one
+  backed by three thousand. Second, and since this revision, it is partly **handled** -
+  `min_year_n` and `truncate_late_years()` cut the series where the per-year sample size
+  gives out, which is the mechanism this note had been asking for, and the filtering log
+  reports what each objective lost. Note that the small-n precedent cited here no longer
+  exists: the year × treatment × ecoregion heatmap that faded tiles under 30 pixels has
+  been removed from the report.*
+
+  *What the truncation does not yet do is protect the peaks specifically. It works on the
+  per-year count across both directions, so a year with enough significant pixels in
+  total can still yield a peak computed from one pixel in a single direction - which is
+  exactly `decrease_shr`'s positive peak at year 27. The sharper instrument remains a
+  minimum significant-pixel count per year × **direction** cell, applied inside
+  `mean_effect_by_year()` so the peak table, the dashed peak lines, the per-objective
+  figure and the compiled figure cannot disagree. The open question is unchanged in kind
+  but narrower in scope: what value, and counted as pixels or polygons. A per-year
+  threshold in the low hundreds would remove most of the small-n peaks above at the cost
+  of cutting several objectives back by a decade, which is a judgement about how much
+  record to give up rather than a defect to fix.*
 - ~~**Add time sample size tables to the `.Rmd`.** Specifically, are sample sizes in the
   later years being reduced, and is that reduction affecting the results
   disproportionately? These tables are the evidence base for the cut-off decision
   above.~~
-  *Addressed: three complementary views. Chunk `results-1_11b` (lines 183-185) gives
-  polygons contributing per year since treatment; chunk `results-1_17` carries a
-  `n_pix` total-pixel column per year in `sig_by_year` (lines 352-366) and labels every
-  bar in the stacked figure with both its group total and its per-direction significant
-  counts (lines 369-373, explained at lines 388-396); and chunk `results-1_19`
-  (lines 456-480) reports total pixels per year bin. Whether the late-year reduction is
-  distorting the results is the judgement the cut-off item above still has to make, but
-  the numbers needed to make it are now in the document.*
+  *Addressed: four complementary views, all in `_objective_block.Rmd` except the last.
+  Chunk `results-X_11` gives polygons contributing per year since treatment; chunk
+  `results-X_18` carries an `n_pix` total-pixel column per year in `sig_by_year` and
+  labels every bar in the stacked figure with both its group total and its per-direction
+  significant counts; chunk `results-X_20` reports total pixels per year bin; and the
+  driver's two new compiled figures print sample sizes directly on the figure -
+  `compile_sig_by_bin_plot` labels each bar with its bin total and
+  `compile_peak_effect_plot` labels each peak with the significant-pixel count behind it.
+  Whether the late-year reduction is distorting the results is the judgement the cut-off
+  item above still has to make, but the numbers needed to make it are now in the
+  document, and for the peaks specifically they are on the figure rather than only in a
+  table column.*
 
 ## Specific questions from collaborators
 
@@ -289,26 +514,48 @@ Cross-objective direction checks that KY asked for. Each of these looks at the
 directions of the *non-target* functional groups when a given objective was the
 management goal.
 
-- When decreasing tree cover was the goal, what do the AFG, SHR and PFG group
-  directions look like?
-- When increasing PFG cover was the goal, what do the AFG directions look like?
-- When decreasing shrub cover was the goal, what do the AFG, PFG and TRE directions
-  look like?
-  *Partly addressed - written but not running. All three questions are coded in chunk
-  `results_total` (lines 604-620) as `compare_related_directions()` calls on
-  `combined_df` (lines 607, 612 and 617), each returning a table of percent significant
-  and percent significant by direction for the named cover responses, plus a figure. The
-  chunk is set `eval = FALSE` at line 604, so none of it appears in the rendered report.
-  Turning it on is the remaining step; note that these calls start from `combined_df`
-  rather than the filtered `s_0$input`, so their denominators are the full dataset.*
+- ~~When decreasing tree cover was the goal, what do the AFG, SHR and PFG group
+  directions look like?~~
+- ~~When increasing PFG cover was the goal, what do the AFG directions look like?~~
+- ~~When decreasing shrub cover was the goal, what do the AFG, PFG and TRE directions
+  look like?~~
+  *Addressed - all three now run and render. They live under the driver's
+  *Cross-objective direction checks* heading, one chunk each
+  (`results_total_tre`, `results_total_pfg`, `results_total_shr`), as
+  `compare_related_directions()` calls on `combined_df`, each returning a table of
+  percent significant and percent significant by direction for the named cover
+  responses, plus a figure.*
+
+  *These were previously written but left `eval = FALSE`, because the third call errored
+  with `nrow(df) > 0 is not TRUE`. The cause was a misspelled objective: the call asked
+  for `decrease_shb`, and the shrub objective in the input data is coded `decrease_shr`
+  (matching the `SHR` `fun_group`, which is the uppercased suffix `split_by_objective()`
+  pairs the two on). `grepl()` on the misspelled string matched no rows, so the function
+  stopped on its own guard - which is the guard behaving correctly, since an empty result
+  there means the filter was wrong rather than that the data is uninteresting. The
+  spelling is fixed, the chunks are evaluated, and the error is recorded as a comment in
+  the first of the three chunks so the same string is not reintroduced.*
+
+  *Two caveats on reading these three tables, stated in the prose above them because they
+  differ from the rest of the report. Their denominators are the **full post-treatment
+  dataset** for the named objective, taken from `combined_df` rather than the post-filter
+  `summaries_mod`, so no sparse treatment × ecoregion combination has been dropped and
+  the percentages are not directly comparable with the compiled tables. And they report
+  raw positive/negative rates rather than intended/unintended, because a non-target cover
+  response has no assigned objective against which a sign could be called intended.*
 - ~~How did significant effects change through time, presented in a way we can actually
   talk about (for example, using the time bins discussed above)?~~
   *Addressed: the talkable versions are the prose sentences rather than the raw tables.
-  Chunk `results-1_17` emits the most- and least-effective year as sentences at
-  lines 398-399; chunk `results-1_18b` builds one bullet per effect direction giving the
-  peak year, its mean effect, SE and significant-pixel count, flagging the peak as
-  censored where relevant (lines 436-448); and chunk `results-1_19` (lines 452-480)
-  provides the 1-5 / 6-10 / 11-15 / 16+ bin table for the coarser statements. Line 450
-  notes explicitly that the year with the largest mean effect need not be the year with
-  the most significant pixels, which is the distinction to keep straight when
-  describing these results.*
+  In `_objective_block.Rmd`, chunk `results-X_18` emits the most- and least-effective
+  year as sentences; chunk `results-X_19` builds one bullet per effect direction giving
+  the peak year, its mean effect, SE and significant-pixel count, flagging the peak as
+  censored where relevant; and chunk `results-X_20` provides the 1-5 / 6-10 / 11-15 / 16+
+  bin table for the coarser statements. The prose below chunk `results-X_19` notes
+  explicitly that the year with the largest mean effect need not be the year with the most
+  significant pixels, which is the distinction to keep straight when describing these
+  results. The two new compiled figures are the cross-objective versions of the same two
+  statements, and they make the contrast concrete: `decrease_tre` has the highest binned
+  significance rates of any objective in the report (37.6% in years 1-5, falling to 18.8%
+  by 16+), while its largest mean effects fall at years 29 and 31 on 100 and 27
+  significant pixels - so the objective with the most reliable detection rate has its
+  headline effect sizes in the sparsest part of its record.*

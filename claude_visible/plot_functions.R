@@ -238,6 +238,225 @@ plot_poly_sig_summary <- function(
   return(p0)
 
 }
+obj_cover_label <- function(tbl) {
+  # Two-line "objective\n(COVER)" axis/facet label, used by every figure drawn
+  # from a table that was compiled ACROSS objectives. Kept as one function
+  # because the compiled tables do not all carry the objective and the cover
+  # response the same way: collect_obj_tables() prepends a single
+  # `objective_cover` column ("decrease_afg_AFG") to tables that lack an
+  # objective/cover pair of their own (e.g. peak_effect_all), and leaves the
+  # pair alone where it exists (e.g. sig_by_bin_all). Both are resolved here so
+  # the facet labels read identically whichever compiled table a figure is
+  # built on, and so the label format lives in one place rather than in each
+  # plotting function.
+
+  if (all(c('objective', 'cover') %in% colnames(tbl))) {
+    return(paste0(tbl$objective, '\n(', tbl$cover, ')'))
+  }
+  if ('objective_cover' %in% colnames(tbl)) {
+    return(sub('_([A-Z]+)$', '\n(\\1)', tbl$objective_cover))
+  }
+  stop('obj_cover_label(): need either `objective` and `cover`, or `objective_cover`')
+}
+plot_peak_effect_summary <- function(
+    peak_effect_all, title = NULL, subtitle = NULL,
+    x_lab = 'Years since treatment',
+    y_lab = 'Mean DART effect at peak (\u0394 RAP cover)',
+    show_n = TRUE
+) {
+  # Cross-objective view of the compiled peak-effect table - i.e. of
+  # collect_obj_tables('peak_effect_'), which stacks each objective's
+  # peak_effect_year() row per direction. It puts the two quantities that table
+  # reports on the two axes at once: WHEN the mean effect over significant
+  # pixels peaked (x) and HOW LARGE that mean was (y), so timing and magnitude
+  # are read together rather than off separate columns.
+  #
+  # One panel per objective x cover response, with a shared y axis, because the
+  # point of the figure is to compare objectives - free scales would make two
+  # panels with very different effect magnitudes look alike. Both directions are
+  # drawn in every panel and are never combined, for the same reason
+  # mean_effect_by_year() keeps them apart: a mean over both would cancel.
+  # Direction colours are the ones used everywhere else in the report.
+  #
+  # The censoring flag from the table is mapped to point shape (hollow = the
+  # peak landed on the last year observed for that direction, so the effect may
+  # still have been growing past the end of the record) rather than being left
+  # to the caption, since a censored peak is the one case where the x position
+  # should not be read as a real peak. `show_n` labels each point with the
+  # number of significant pixels behind it, which is often in the tens for late
+  # peaks and is the main reason to distrust one.
+
+  require(ggplot2)
+
+  dir_pal <- c('Significant positive' = '#b2182b', 'Significant negative' = '#2166ac')
+  cen_lab <- c('Peak within record', 'Peak on last year observed')
+
+  pk <- as.data.frame(peak_effect_all)
+  pk$obj_lab   <- obj_cover_label(pk)
+  pk$direction <- factor(
+    ifelse(pk$direction == 'positive', 'Significant positive', 'Significant negative'),
+    levels = names(dir_pal)
+  )
+  pk$censoring <- factor(ifelse(pk$is_censored, cen_lab[2], cen_lab[1]), levels = cen_lab)
+
+  # A peak backed by a single significant pixel has no SE (the SD of one value
+  # is NA). It is kept and drawn with a zero-width error bar rather than
+  # dropped, the same way plot_mean_effect_year() handles a one-pixel year x
+  # direction cell: an NA here would silently remove both the error bar and the
+  # sample-size label, so the one peak the reader should trust least would be
+  # the one with no n printed next to it.
+  pk$peak_se[is.na(pk$peak_se)] <- 0
+
+  # Sample-size labels are pushed away from the zero line (above a positive
+  # peak, below a negative one) so they cannot land on top of the point or its
+  # error bar: the label is anchored to the far end of the bar, not to the mean.
+  # They are drawn as two layers with a fixed `vjust` each rather than one layer
+  # with `vjust` mapped per row - a per-row justification aesthetic was being
+  # applied inconsistently enough to leave labels sitting on their own points.
+  pk$.lab   <- paste0('n = ', pk$peak_n_pix)
+  pk_up     <- pk[pk$peak_effect > 0, ]
+  pk_dn     <- pk[pk$peak_effect <= 0, ]
+  pk_up$.y  <- pk_up$peak_effect + pk_up$peak_se
+  pk_dn$.y  <- pk_dn$peak_effect - pk_dn$peak_se
+
+  p0 <- pk |>
+    ggplot(aes(x = peak_year, y = peak_effect, colour = direction, shape = censoring)) +
+    geom_hline(yintercept = 0, linewidth = 0.3) +
+    geom_errorbar(
+      aes(ymin = peak_effect - peak_se, ymax = peak_effect + peak_se),
+      width = 1.2, linewidth = 0.4, show.legend = FALSE
+    ) +
+    geom_point(size = 2.4, fill = 'white', stroke = 0.8) +
+    scale_colour_manual(values = dir_pal, name = 'Direction') +
+    # drop = FALSE keeps both keys in the legend even when no peak in the
+    # compiled table happens to be censored, so the hollow symbol is always
+    # explained rather than only appearing in the runs that have one.
+    scale_shape_manual(
+      values = setNames(c(16, 21), cen_lab), drop = FALSE, name = 'Censoring'
+    ) +
+    facet_wrap(~ obj_lab) +
+    # Horizontal room for the sample-size labels, which are centred on their
+    # point: a peak in year 1 or in the last year of the record sits hard against
+    # the panel edge, and without this its label is clipped to a fragment.
+    scale_x_continuous(expand = expansion(mult = c(0.12, 0.12))) +
+    labs(
+      x = x_lab, y = y_lab,
+      title = if (is.null(title)) 'Peak mean DART effect: when it happened and how large it was' else title,
+      subtitle = subtitle
+    ) +
+    theme_bw() +
+    theme(
+      axis.text  = element_text(color = 'black'),
+      strip.text = element_text(color = 'black', size = 8)
+    )
+
+  if (show_n) {
+    if (nrow(pk_up)) {
+      p0 <- p0 + geom_text(
+        data = pk_up, aes(x = peak_year, y = .y, label = .lab, colour = direction),
+        inherit.aes = FALSE, vjust = -0.6, size = 2.2, show.legend = FALSE
+      )
+    }
+    if (nrow(pk_dn)) {
+      p0 <- p0 + geom_text(
+        data = pk_dn, aes(x = peak_year, y = .y, label = .lab, colour = direction),
+        inherit.aes = FALSE, vjust = 1.6, size = 2.2, show.legend = FALSE
+      )
+    }
+    # The n labels sit outside the error bars, so the panels need more vertical
+    # room than the data alone would ask for or they get clipped.
+    p0 <- p0 + scale_y_continuous(expand = expansion(mult = c(0.20, 0.20)))
+  }
+
+  return(p0)
+
+}
+plot_sig_by_bin_summary <- function(
+    sig_by_bin_all, title = NULL, subtitle = NULL,
+    x_lab = 'Years since treatment (binned)',
+    y_lab = '% of pixels with a significant effect',
+    show_n = TRUE
+) {
+  # Cross-objective view of the compiled year-bin table - i.e. of
+  # collect_obj_tables('sig_by_bin_'). This is the binned, all-objectives
+  # analogue of plot_sig_direction_stacked(): the same quantity (how OFTEN a
+  # significant effect occurred, split into its positive and negative
+  # components) at the coarser 1-5 / 6-10 / 11-15 / 16+ resolution, with one
+  # panel per objective x cover response instead of one figure per objective.
+  #
+  # It answers the companion question to plot_peak_effect_summary() above, which
+  # measures how LARGE the significant effects were. Both are drawn from the two
+  # tables in the same section of the report, and they can disagree: a bin can
+  # carry a high significance rate with small effects, or the reverse.
+  #
+  # Stacking order is fixed (significant negative against the axis, significant
+  # positive above it) rather than following the intended direction the way
+  # plot_sig_direction_stacked()'s `reverse_stack` does. Intent differs between
+  # panels here - it is negative for a `decrease_*` objective and positive for
+  # an `increase_*` one - so no single stacking order could carry it, and a
+  # per-panel order would make the panels harder to read against each other.
+  # The fill colours still mean the raw direction, as everywhere else.
+
+  require(ggplot2)
+  require(dplyr)
+  require(tidyr)
+
+  dir_pal <- c('Significant positive' = '#b2182b', 'Significant negative' = '#2166ac')
+
+  tb <- as.data.frame(sig_by_bin_all)
+  tb$obj_lab <- obj_cover_label(tb)
+
+  plot_df <- tb |>
+    tidyr::pivot_longer(
+      cols = c(mean_pct_sig_pos, mean_pct_sig_neg),
+      names_to = 'direction', values_to = 'pct'
+    ) |>
+    dplyr::mutate(
+      direction = factor(
+        ifelse(direction == 'mean_pct_sig_pos', 'Significant positive', 'Significant negative'),
+        levels = names(dir_pal)
+      )
+    )
+
+  # Bin total (every pixel in that bin, significant or not) sitting above the
+  # bar, rotated upright so a long "n = XXXXXX" string fits between bars - the
+  # same two-level sample-size convention as plot_sig_direction_stacked(), minus
+  # the per-segment labels, which the panels are too narrow to hold.
+  label_df <- tb
+  label_df$y_lab <- tb$mean_pct_sig_pos + tb$mean_pct_sig_neg
+  label_df$lab   <- paste0('n = ', tb$n_pix)
+
+  p0 <- plot_df |>
+    ggplot(aes(x = year_bin, y = pct, fill = direction)) +
+    geom_col() +
+    scale_fill_manual(values = dir_pal, name = 'Direction') +
+    facet_wrap(~ obj_lab) +
+    labs(
+      x = x_lab, y = y_lab,
+      title = if (is.null(title)) 'Significant DART effects by years since treatment, binned' else title,
+      subtitle = subtitle
+    ) +
+    theme_bw() +
+    theme(
+      axis.text  = element_text(color = 'black'),
+      strip.text = element_text(color = 'black', size = 8)
+    )
+
+  if (show_n) {
+    p0 <- p0 +
+      geom_text(
+        data = label_df, aes(x = year_bin, y = y_lab, label = lab),
+        inherit.aes = FALSE, angle = 90, hjust = -0.1, size = 2.2
+      ) +
+      # Upper expansion is generous because the bin totals run to six digits on
+      # the real data and the labels are rotated upright, so the label above the
+      # tallest bar needs roughly half the bar's own height in clear space.
+      scale_y_continuous(expand = expansion(mult = c(0.05, 0.50)))
+  }
+
+  return(p0)
+
+}
 plot_mean_effect_year <- function(
     effect_by_year, col_year = 'year_diff',
     x_lab = 'Years since treatment', y_lab = 'Mean DART effect (\u0394 RAP cover)',
