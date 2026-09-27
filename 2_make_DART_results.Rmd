@@ -5,7 +5,7 @@ date: "September 2026"
 output: html_document
 ---
 
-TODO: figure out a better/more consistent way to talk about the positive/negative directionality of the significant DART responses with respect to the objective. for example, a significant positive (above 0) result for `decrease_afg` is actually a negative result overall with respect to management goals, but a significant positive (above 0) result for `increase_pfg` is a positive result overall.
+**A note on terminology:** this report uses "positive"/"negative" and "intended"/"unintended" for two different things, and they are not interchangeable. "Positive effect" and "negative effect" always refer to the raw sign of the (differenced) RAP cover effect itself, independent of any objective - a positive effect means RAP cover went up, a negative effect means it went down. "Intended" and "unintended" always refer to that same raw sign *relative to the assigned objective's management goal*: for a `decrease_*` objective, a negative effect is intended and a positive effect is unintended; for an `increase_*` objective, it's the reverse. So a significant positive effect is a *good* (intended) result under `increase_pfg`, but a *bad* (unintended) result under `decrease_afg` - same raw sign, opposite management meaning. `get_intended_sign()` and `label_intended()` (`helper_functions.R`) encode this mapping in one place so it's applied consistently everywhere this distinction matters (e.g. `reduce_s0()`'s `sig_des`/`sig_und` columns and the summary table's "Intended"/"Unintended" columns below). Sections that compare *raw* positive-effect rates across objectives (e.g. the `summarize_sig_effect()` calls below) are deliberately using the raw, objective-agnostic sign for an apples-to-apples comparison, not the intended/unintended framing.
 
 ```{r setup, message = F, warning = F, echo = F}
 
@@ -178,6 +178,11 @@ Polygon count table, plotted as histogram, zeroes excluded:
 s_0$poly_plot
 ```
 
+Polygon count table: for each year since treatment, how many distinct polygons contribute at least one pixel that year.
+
+```{r results-1_11b, echo = F}
+s_0$poly_plot_year
+```
 #### How many pixels have a significant DART result?
 
 DART results are considered significant if the confidence intervals for each DART estimate do not include zero.
@@ -189,35 +194,43 @@ Objective: **`r print_summary_name(summaries, r_ind, 4)`**
 cat(sprintf("- **%.1f%%** of pixels show a statistically significant DART result.\n", s_0$pix_sig_TOT[1]))
 cat(sprintf("- **%.1f%%** of all pixels show a significant *positive* effect.\n", s_0$pix_sig_TOT[2]))
 cat(sprintf("- **%.1f%%** of all pixels show a significant *negative* effect.\n", s_0$pix_sig_TOT[3]))
-
-# SE/SD around these overall percentages, taken across polygons: rather than treating
-# every pixel as an independent observation (pixels within a polygon are spatially
-# correlated), we first collapse to one % significant per polygon, then compute the
-# mean/SD/SE of that per-polygon rate. This gives a sense of how variable the overall
-# significance rate is from one polygon to the next.
-poly_sig <- s_0$input |>
-  dplyr::group_by(polygon) |>
-  dplyr::summarise(
-    pct_sig     = 100 * mean(sig),
-    pct_sig_pos = 100 * mean(sig & effect > 0),
-    pct_sig_neg = 100 * mean(sig & effect < 0),
-    .groups = 'drop'
-  )
-
-se <- function(x) sd(x) / sqrt(length(x))
-
-# TODO: format the sd/se list as a table that includes the objective, cover class, and polygon sample size so that it can be expanded
-# TODO: write a plotting function that takes this table as an input and makes a `ggplot` figure
-cat(sprintf(
-  '\nAcross %d polygons, the mean %% of pixels with a significant result was %.1f%% (SD = %.1f, SE = %.2f); mean %% significant *positive* was %.1f%% (SD = %.1f, SE = %.2f); mean %% significant *negative* was %.1f%% (SD = %.1f, SE = %.2f).\n',
-  nrow(poly_sig),
-  mean(poly_sig$pct_sig),     sd(poly_sig$pct_sig),     se(poly_sig$pct_sig),
-  mean(poly_sig$pct_sig_pos), sd(poly_sig$pct_sig_pos), se(poly_sig$pct_sig_pos),
-  mean(poly_sig$pct_sig_neg), sd(poly_sig$pct_sig_neg), se(poly_sig$pct_sig_neg)
-))
 ```
 
-The overall DART result here is that 28.1% of all DART pixels were significant. Treatments were successful in 5.4% of treated pixels and anti-successful in 22.7% of treated pixels, relative to the assigned objective. I would hypothesize that the very strong anti-successful result has to do with disturbance effects or the interact effects of compound objectives.
+For `decrease_afg`, a negative effect is the *intended* one (see the terminology note above), so of the two bullets above, the "significant negative" share is the intended result and the "significant positive" share is unintended.
+
+Per-polygon SD/SE around these overall percentages (rather than treating every pixel as an independent observation - pixels within a polygon are spatially correlated - we first collapse to one % significant per polygon, then take the mean/SD/SE of that per-polygon rate, giving a sense of how variable the overall significance rate is from one polygon to the next):
+
+```{r results-1_12b, echo = F}
+poly_sig_summary <- summarize_poly_sig(
+  s_0$input,
+  objective_label = print_summary_name(summaries, r_ind, 4),
+  cover_label     = print_summary_name(summaries, r_ind, 3)
+)
+
+# poly_sig_summary is one row, tagged with objective/cover/n_polygons - as more
+# objectives are added to this report, rbind() their summarize_poly_sig() rows
+# onto this same table rather than replacing it, so the table (and the plot
+# below) grows to cover every objective in one place.
+knitr::kable(
+  poly_sig_summary,
+  col.names = c(
+    'Objective', 'Cover', 'N Polygons',
+    'Mean % Sig.', 'SD', 'SE',
+    'Mean % Sig. Positive', 'SD', 'SE',
+    'Mean % Sig. Negative', 'SD', 'SE'
+  ),
+  digits = 2
+)
+```
+
+```{r results-1_12c, echo = F}
+# TODO: change this code and this function so that all three metrics are plotted on the same graph. or, add a metric 'all' that does this 
+plot_poly_sig_summary(poly_sig_summary, metric = 'overall')
+plot_poly_sig_summary(poly_sig_summary, metric = 'positive')
+plot_poly_sig_summary(poly_sig_summary, metric = 'negative')
+```
+
+The overall DART result here is that 28.1% of all DART pixels were significant. Treatments produced the intended effect in 5.4% of treated pixels and an unintended effect in 22.7% of treated pixels, relative to the assigned objective. I would hypothesize that the very strong unintended-effect result has to do with disturbance effects or the interact effects of compound objectives.
 
 ```{r results-1_13, echo = F}
 res_obj <- summarize_sig_effect(
@@ -308,11 +321,9 @@ For the `decrease_afg` objective, the green bars should generally reflect a nega
 
 #### How does time since treatment affect significance?
 
-```{r results-1_17_a, echo = F}
-# TODO: rather than 17_a,b, etc... just use sequential numbering (17, 18, 19, ...)
-# TODO: break up the overall DART significance 
-# --- Significance by year_diff, organized the same way as the ecoregion/treatment
-# breakdowns above ---
+TODO: remove any weighting approaches to the time analysis - i.e. what is the mean value of `s_0$input$effect` per year, and what year does this peak? This should be done only for pixels which are significant, split up by direction of effect. But don't mess with `plot_sig_direction_stacked` - that figure is great. 
+
+```{r results-1_17, echo = F}
 sig_by_year <- s_0$input |>
   dplyr::group_by(year_diff) |>
   dplyr::summarise(
@@ -329,22 +340,16 @@ knitr::kable(
   col.names = c('Years Since Treatment', 'Total Pixels', '% Significant (any)', '% Significant Positive', '% Significant Negative')
 )
 
-# TODO: break up the overall DART significance into positive/negative significant effects, using a stacked bar chart. for this graph, significant negative effect should be adjacent to the X-axis, but for plotting other results there should be a flag to reverse that, while keeping the color scheme the same. Finally, sample size should be plotted directly on the bars as `(n = XX)`.
-
-# TODO: wrap this plot in a function call and move it to `plot_functions.R`
-
-ggplot(sig_by_year, aes(x = year_diff, y = pct_sig)) +
-  geom_col(fill = 'grey35') +
-  labs(
-    x = 'Years since treatment', y = '% of pixels with a significant DART result',
-    title = 'Overall DART significance through time'
-  ) +
-  theme_bw() +
-  theme(axis.text = element_text(color = 'black'))
+# TODO: flip the (n = XX) labels vertically, and calculate a separate n value for both the significant positive and significant negative bars
+plot_sig_direction_stacked(
+  s_0$input, group_col = 'year_diff', reverse_stack = FALSE,
+  x_lab = 'Years since treatment',
+  title = 'Significant DART effects through time, by direction',
+  subtitle = paste0(print_summary_name(summaries, r_ind, 5), ' (negative = intended)')
+)
 ```
 
-```{r results-1_17_b, echo = F}
-# --- MOST/LEAST effective year, quantified by % significant pixels ---
+```{r results-1_18, echo = F}
 year_most  <- sig_by_year$year_diff[which.max(sig_by_year$pct_sig)]
 year_least <- sig_by_year$year_diff[which.min(sig_by_year$pct_sig)]
 
@@ -358,7 +363,7 @@ cat(sprintf(
 ))
 ```
 
-```{r results-1_17_c, echo = F}
+```{r results-1_19, echo = F}
 # --- 5/10/15+ year bins for % significant pixels ---
 s_0$input$year_bin <- cut(
   s_0$input$year_diff,
@@ -370,26 +375,40 @@ s_0$input$year_bin <- cut(
 sig_by_bin <- s_0$input |>
   dplyr::group_by(year_bin) |>
   dplyr::summarise(
-    n_pix       = dplyr::n(),
-    mean_pct_sig = round(100 * mean(sig), 2),
+    n_pix        = dplyr::n(),
+    mean_pct_sig     = round(100 * mean(sig), 2),
+    mean_pct_sig_pos = round(100 * mean(sig & effect > 0), 2),
+    mean_pct_sig_neg = round(100 * mean(sig & effect < 0), 2),
     .groups = 'drop'
+  ) |>
+  dplyr::mutate(
+    objective = print_summary_name(summaries, r_ind, 4),
+    cover     = print_summary_name(summaries, r_ind, 3),
+    .before   = 1
   )
 
-# TODO: add the objective/cover type to this table and add columns for "% positive significant" and "% negative significant"
 knitr::kable(
   sig_by_bin,
-  col.names = c('Year Bin', 'Total Pixels', 'Mean % Significant')
+  col.names = c('Objective', 'Cover', 'Year Bin', 'Total Pixels', 'Mean % Significant', 'Mean % Significant Positive', 'Mean % Significant Negative')
 )
 ```
 
-```{r results-1_17_d, echo = F}
+```{r results-1_20, echo = F}
 # --- By-polygon: which year_diff was each polygon's most/least significant, and
 # is that peak/trough censored (i.e. does it land on the LAST year observed for
-# that polygon, meaning we can't tell if it would have kept climbing/falling)? ---
+# that polygon, meaning we can't tell if it would have kept climbing/falling)?
+# pct_sig_pos/pct_sig_neg are carried alongside the overall pct_sig here so that
+# the weighted-heatmap chunk below can reuse this same table for the
+# positive-only and negative-only versions of that figure. ---
 poly_year_sig <- s_0$input |>
   dplyr::group_by(polygon, tx_coarse, us_l4name, year_diff) |>
-  dplyr::summarise(n_pix = dplyr::n(), pct_sig = 100 * mean(sig), .groups = 'drop')
-
+  dplyr::summarise(
+    n_pix       = dplyr::n(),
+    pct_sig     = 100 * mean(sig),
+    pct_sig_pos = 100 * mean(sig & effect > 0),
+    pct_sig_neg = 100 * mean(sig & effect < 0),
+    .groups = 'drop'
+  )
 poly_best_worst <- poly_year_sig |>
   dplyr::group_by(polygon, tx_coarse, us_l4name) |>
   dplyr::summarise(
@@ -434,56 +453,32 @@ knitr::kable(time_summary_by_eco, col.names = c('Ecoregion', col_lab_time[-1]))
 
 A polygon's peak (or trough) year is flagged as "censored" when it falls on the last year that polygon was observed - in those cases we can't rule out that significance was still rising (or falling) beyond the end of the available time series. There are implications here for stable-state-change discussion.
 
-```{r results-1_17_e, echo = F}
-# TODO: move this comment into a plain text block below the figures
-# --- Weighting the time series by the magnitude of significance, rather than
-# picking a single hard peak year: for each polygon, compute a significance-weighted
-# mean year (years with a higher % significant pixels count more). This is a
-# smoother alternative to "the single best year" and is less sensitive to noise in
-# any one year. Visualized here as a treatment x ecoregion heatmap. ---
+```{r results-1_21, echo = F}
+# Weighting is delegated to weighted_peak_year() (helper_functions.R) and the
+# figure itself to plot_weighted_peak_heatmap() (plot_functions.R) - see the
+# explanation below the figures for what the weighting means and why. "Peak
+# significance" is broken into overall / positive-only / negative-only versions
+# by passing `direction` through to plot_weighted_peak_heatmap(), which reuses
+# poly_year_sig's pct_sig / pct_sig_pos / pct_sig_neg columns as the weight.
+obj_lab   <- print_summary_name(summaries, r_ind, 4)
+cover_lab <- print_summary_name(summaries, r_ind, 3)
 
-# TODO: "peak significance" needs to be broken up into positive/negative direction significance. the plot look good here so the positive/negative should be added as a flag to the figure code that plots it one of two ways, with both figures (positive/negative significance) plotted here separately
-
-# TODO: describe this weighting procedure in more detail. is there a term for this kind of weighting? does R have any built-in tools that could help with this?
-poly_weighted_time <- poly_year_sig |>
-  dplyr::group_by(polygon, tx_coarse, us_l4name) |>
-  dplyr::summarise(
-    # TODO: define this weighting scheme in more verbose form outside the summarise block for clarity
-    weighted_year = if (sum(pct_sig) > 0) sum(year_diff * pct_sig) / sum(pct_sig) else NA_real_,
-    .groups = 'drop'
-  ) |>
-  dplyr::filter(!is.na(weighted_year))
-
-heatmap_df <- poly_weighted_time |>
-  dplyr::group_by(tx_coarse, us_l4name) |>
-  dplyr::summarise(mean_weighted_year = mean(weighted_year), .groups = 'drop')
-
-# TODO: add the objective/cover type somewhere on this plot
-# TODO: wrap this plot code in a function and move it to `plot_functions.R`.
-ggplot(heatmap_df, aes(x = tx_coarse, y = us_l4name, fill = mean_weighted_year)) +
-  geom_tile(color = 'white') +
-  scale_fill_viridis_c(option = 'magma', name = 'Mean\nsignificance-\nweighted year') +
-  labs(
-    x = 'Treatment', y = 'Ecoregion',
-    title = 'Mean (significance-weighted) \nyear of peak DART significance'
-  ) +
-  theme_bw() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1, color = 'black'),
-    axis.text.y = element_text(color = 'black')
-  )
+plot_weighted_peak_heatmap(poly_year_sig, direction = 'overall',  obj_label = obj_lab, cover_label = cover_lab)
+plot_weighted_peak_heatmap(poly_year_sig, direction = 'positive', obj_label = obj_lab, cover_label = cover_lab)
+plot_weighted_peak_heatmap(poly_year_sig, direction = 'negative', obj_label = obj_lab, cover_label = cover_lab)
 ```
+
+The three heatmaps above summarize, for each treatment × ecoregion cell, a significance-weighted "peak year": rather than picking one hard peak/trough year per polygon (as in the table above, which is sensitive to noise in any single year), each polygon's years are averaged together with each year's % significant pixels used as its weight - years with a stronger signal pull the estimate toward them more than years with little or none. This is a **weighted mean** (sometimes called a weighted centroid, or center of mass, of the time series), computed with base R's `stats::weighted.mean()` rather than a hand-rolled `sum(year * weight) / sum(weight)`. The three versions use, respectively, the overall % significant, % significant positive only, and % significant negative only as the weight, so a polygon's overall peak can be checked against which direction (intended vs. unintended) was actually driving it.
 
 #### How often does this objective overlap with other objectives?
 
 Pixels can be assigned more than one objective at once (the `objective` column lists all objectives that applied to a pixel). The table below shows, among pixels assigned to the current objective, how often each other objective was *also* assigned to that same pixel.
 
-TODO: does this calculation involve all of the data? or just the objective-specific data? add the answer to the plain-text explanation here
+This is computed from `s_0$input`, which by this point in the report is **objective-specific, filtered data** - not the full combined dataset (`combined_df`). Specifically, `s_0$input` has already been narrowed down to: (1) only the `decrease_afg` / `AFG` objective-cover combination (via `split_by_objective()`, which also drops pre-treatment rows), and (2) only the treatment × ecoregion combinations that survived the sparse-combination filter earlier in this document (the "Results after drops" section). So the percentages below answer "of the pixels *actually used in this objective's analysis*, how often was each other objective also present?" - not "across the entire raw dataset, how often do these objectives co-occur?" The latter question would need to start from `combined_df` instead (see `compare_related_directions()` in `helper_functions.R`, used for a related cross-objective comparison later in this document).
 
-```{r results-1_18, echo = F}
-
-# TODO: add objective/cover to the table output of this section so it can be generalized and combined
-cur_obj <- gsub(' ', '_', print_summary_name(summaries, r_ind, 4))
+```{r results-1_22, echo = F}
+cur_obj   <- gsub(' ', '_', print_summary_name(summaries, r_ind, 4))
+cur_cover <- print_summary_name(summaries, r_ind, 3)
 
 obj_split <- strsplit(s_0$input$objective, ', ')
 other_obj <- lapply(obj_split, setdiff, y = cur_obj)
@@ -492,28 +487,36 @@ n_total     <- length(obj_split)
 n_solo      <- sum(lengths(other_obj) == 0)
 flat_other  <- unlist(other_obj)
 
-# Build with a fixed 3-column shape regardless of whether any overlap exists at all,
-# so the kable() call below always gets the column count it expects.
-overlap_tbl <- data.frame(objective = character(0), n_pix = integer(0), pct_pix = numeric(0))
+# Build with a fixed shape regardless of whether any overlap exists at all, so the
+# kable() call below always gets the column count it expects. `objective` and
+# `cover` (the CURRENT objective/cover, not the co-occurring one) are included so
+# that this table can later be rbind()-ed across objectives into one combined table.
+overlap_tbl <- data.frame(
+  objective = character(0), cover = character(0),
+  co_occurring_objective = character(0), n_pix = integer(0), pct_pix = numeric(0)
+)
 if (length(flat_other) > 0) {
   tab <- sort(table(flat_other), decreasing = TRUE)
   overlap_tbl <- data.frame(
-    objective = names(tab),
+    objective = cur_obj,
+    cover     = cur_cover,
+    co_occurring_objective = names(tab),
     n_pix     = as.integer(tab),
     pct_pix   = round(100 * as.integer(tab) / n_total, 2),
     row.names = NULL
   )
 }
 
-# TODO: find a clever way to add the `cat(sprintf())` call to the kable
-cat(sprintf(
-  '\nOf %d total pixels assigned to "%s", %d (%.1f%%) had no other co-occurring objective.\n\n',
-  n_total, cur_obj, n_solo, round(100 * n_solo / n_total, 1)
-))
-
+# The `cat(sprintf())` explanatory line is now folded directly into the kable's
+# caption (rather than emitted as a separate line above the table), so the
+# "no other co-occurring objective" context always travels with the table itself.
 knitr::kable(
   overlap_tbl,
-  col.names = c('Co-occurring Objective', 'Pixel Count', '% of Total Pixels')
+  col.names = c('Objective', 'Cover', 'Co-occurring Objective', 'Pixel Count', '% of Total Pixels'),
+  caption = sprintf(
+    'Of %d total pixels assigned to "%s", %d (%.1f%%) had no other co-occurring objective.',
+    n_total, cur_obj, n_solo, round(100 * n_solo / n_total, 1)
+  )
 )
 ```
 
@@ -545,7 +548,6 @@ res_decrease_shb$plot
 # objective itself (see split_by_objective()), so we strip that back off to get the
 # objective on its own before tallying.
 
-# TODO: add "# of times this was the treatment" and "% times this was the treatment" after the "Treatment" column. This #/% should reflect percentages within each objective, not relative to the entire dataset
 poly_by_elem   <- sapply(summaries, function(x) length(unique(x$input$polygon)))
 obj_of_elem    <- sub('_[A-Z]+$', '', names(summaries))
 poly_by_obj    <- tapply(poly_by_elem, obj_of_elem, sum)
@@ -555,14 +557,28 @@ cur_obj      <- gsub(' ', '_', print_summary_name(summaries, r_ind, 4))
 n_time_obj   <- unname(poly_by_obj[cur_obj])
 pct_time_obj <- round(100 * n_time_obj / total_poly_all, 2)
 
+# "# / % of time this was the treatment": within THIS objective's own data
+# (s_0$input, already filtered to decrease_afg/AFG and post sparse-combo drops),
+# how many of the objective's n_time_obj polygons received each treatment,
+# across all ecoregions? This is deliberately a percentage of n_time_obj (the
+# objective's own polygon count), not of total_poly_all (every objective's
+# polygons combined) - a polygon that received more than one treatment across
+# its pixels will be counted under more than one treatment, so these percentages
+# are not expected to sum to 100.
+poly_by_tx <- s_0$input |>
+  dplyr::group_by(tx_coarse) |>
+  dplyr::summarise(n_time_treatment = length(unique(polygon)), .groups = 'drop') |>
+  dplyr::mutate(pct_time_treatment = round(100 * n_time_treatment / n_time_obj, 2))
+
 summary_table <- s0_summary_aft |>
+  dplyr::left_join(poly_by_tx, by = 'tx_coarse') |>
   dplyr::mutate(
     n_time_objective   = n_time_obj,
     pct_time_objective = pct_time_obj
   ) |>
   dplyr::select(
     n_time_objective, pct_time_objective,
-    objective, fun_group, tx_coarse, us_l4name,
+    objective, fun_group, tx_coarse, n_time_treatment, pct_time_treatment, us_l4name,
     grp_n_pix, grp_n_poly, grp_n_sig, grp_n_sig_int, grp_n_sig_uni, grp_perc_int, grp_perc_uni
   )
 
@@ -570,7 +586,9 @@ knitr::kable(
   summary_table,
   col.names = c(
     '# Times This Was Objective', '% of Time This Was Objective',
-    'Objective', 'Cover Response', 'Treatment Method', 'Ecoregion',
+    'Objective', 'Cover Response', 'Treatment Method',
+    '# Times This Was Treatment', '% of Time This Was Treatment',
+    'Ecoregion',
     'Total Pixels', 'Number Polygons', '# Significant Pixels',
     '# Significant Pixels (Intended)', '# Significant Pixels (Unintended)',
     '% Significant Pixels (Intended)', '% Significant Pixels (Unintended)'

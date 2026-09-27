@@ -1,3 +1,166 @@
+plot_sig_direction_stacked <- function(
+    df, group_col, sig_col = 'sig', effect_col = 'effect',
+    reverse_stack = FALSE, x_lab = group_col, title = NULL, subtitle = NULL,
+    show_n = TRUE
+) {
+  # Stacked bar chart breaking the overall "% significant" apart into its
+  # significant-positive and significant-negative components (rather than one
+  # undifferentiated bar), for whatever grouping variable is passed as `group_col`
+  # (e.g. `year_diff`).
+  #
+  # Stacking order / color: the fill color is always tied to direction
+  # ("Significant positive" vs "Significant negative"), regardless of stacking
+  # order, so the color scheme never changes between calls. By default
+  # (reverse_stack = FALSE), "Significant negative" is drawn adjacent to the
+  # x-axis and "Significant positive" on top - this is the natural default for
+  # e.g. `decrease_afg`, where a negative effect is the intended one. Pass
+  # reverse_stack = TRUE to flip which segment sits at the axis (e.g. for an
+  # `increase_*` objective) without touching the color mapping.
+  #
+  # Sample size: each bar is labeled "(n = XX)" above its top, where XX is the
+  # total pixel count for that group (not just the significant pixels), so the
+  # reader can see how much data backs each bar.
+
+  require(dplyr)
+  require(ggplot2)
+  require(tidyr)
+
+  grp_summary <- df |>
+    dplyr::group_by(.data[[group_col]]) |>
+    dplyr::summarise(
+      n_total = dplyr::n(),
+      pct_pos = 100 * mean(.data[[sig_col]] & .data[[effect_col]] > 0),
+      pct_neg = 100 * mean(.data[[sig_col]] & .data[[effect_col]] < 0),
+      .groups = 'drop'
+    )
+
+  plot_df <- grp_summary |>
+    tidyr::pivot_longer(
+      cols = c(pct_pos, pct_neg),
+      names_to = 'direction', values_to = 'pct'
+    ) |>
+    dplyr::mutate(
+      direction = factor(
+        ifelse(direction == 'pct_pos', 'Significant positive', 'Significant negative'),
+        levels = c('Significant positive', 'Significant negative')
+      )
+    )
+
+  label_df <- grp_summary |>
+    dplyr::mutate(
+      y_lab = pct_pos + pct_neg,
+      lab   = paste0('(n = ', n_total, ')')
+    )
+
+  p0 <- plot_df |>
+    ggplot(aes(x = .data[[group_col]], y = pct, fill = direction)) +
+    geom_col(position = position_stack(reverse = reverse_stack)) +
+    scale_fill_manual(values = c('Significant positive' = '#b2182b', 'Significant negative' = '#2166ac')) +
+    labs(
+      x = x_lab, y = '% of pixels with a significant effect',
+      fill = 'Direction',
+      title = if (is.null(title)) 'Significant DART effects, by direction' else title,
+      subtitle = subtitle
+    ) +
+    theme_bw() +
+    theme(axis.text = element_text(color = 'black'))
+
+  if (show_n) {
+    p0 <- p0 + geom_text(
+      data = label_df, aes(x = .data[[group_col]], y = y_lab, label = lab),
+      inherit.aes = FALSE, vjust = -0.4, size = 2.5
+    )
+  }
+
+  return(p0)
+
+}
+plot_poly_sig_summary <- function(tbl, metric = c('overall', 'positive', 'negative')) {
+  # Takes the expandable per-objective/cover summary table built by
+  # summarize_poly_sig() (helper_functions.R) - one row per objective/cover
+  # combination, with mean/SD/SE of % significant pixels taken across polygons -
+  # and plots it as a point-range chart (mean +/- SE) so multiple objectives can
+  # be compared on one figure as they're added to the report.
+
+  require(ggplot2)
+
+  metric <- match.arg(metric)
+  mean_col <- switch(metric, overall = 'mean_pct_sig', positive = 'mean_pct_sig_pos', negative = 'mean_pct_sig_neg')
+  se_col   <- switch(metric, overall = 'se_pct_sig',   positive = 'se_pct_sig_pos',   negative = 'se_pct_sig_neg')
+
+  tbl$.label   <- paste0(tbl$objective, '\n(', tbl$cover, ')')
+  tbl$.mean    <- tbl[[mean_col]]
+  tbl$.se      <- tbl[[se_col]]
+
+  p0 <- tbl |>
+    ggplot(aes(x = .label, y = .mean)) +
+    geom_pointrange(aes(ymin = .mean - .se, ymax = .mean + .se), size = 0.6) +
+    labs(
+      x = 'Objective (cover response)', y = paste0('Mean % significant (', metric, '), ± SE across polygons'),
+      title = paste0('Per-polygon significance summary: ', metric)
+    ) +
+    theme_bw() +
+    theme(axis.text = element_text(color = 'black'))
+
+  return(p0)
+
+}
+plot_weighted_peak_heatmap <- function(
+    poly_year_sig, direction = c('overall', 'positive', 'negative'),
+    obj_label = NULL, cover_label = NULL
+) {
+  # Treatment x ecoregion heatmap of the mean, significance-weighted "peak year"
+  # (see weighted_peak_year() in helper_functions.R for the weighting scheme
+  # itself). `poly_year_sig` is expected to have one row per
+  # polygon/tx_coarse/us_l4name/year_diff, with pre-computed pct_sig, pct_sig_pos,
+  # and pct_sig_neg columns (as built in the .Rmd's time-since-treatment section).
+  # `direction` selects which of those three weight columns to use, so the same
+  # function can produce the "overall", "significant positive only", or
+  # "significant negative only" version of the figure - the three are meant to be
+  # looked at side by side, since a polygon's overall peak significance year can
+  # be driven by either direction.
+
+  require(dplyr)
+  require(ggplot2)
+
+  direction <- match.arg(direction)
+  weight_col <- switch(direction, overall = 'pct_sig', positive = 'pct_sig_pos', negative = 'pct_sig_neg')
+
+  poly_weighted <- poly_year_sig |>
+    dplyr::group_by(polygon, tx_coarse, us_l4name) |>
+    dplyr::summarise(
+      weighted_year = weighted_peak_year(year_diff, .data[[weight_col]]),
+      .groups = 'drop'
+    ) |>
+    dplyr::filter(!is.na(weighted_year))
+
+  heatmap_df <- poly_weighted |>
+    dplyr::group_by(tx_coarse, us_l4name) |>
+    dplyr::summarise(mean_weighted_year = mean(weighted_year), .groups = 'drop')
+
+  subtitle_txt <- if (!is.null(obj_label) || !is.null(cover_label)) {
+    paste0('Cover: ', cover_label, '  |  Objective: ', obj_label)
+  } else NULL
+
+  title_txt <- paste0(
+    'Mean (significance-weighted) year of peak DART significance\n',
+    '(', switch(direction, overall = 'all significant pixels', positive = 'significant positive pixels only', negative = 'significant negative pixels only'), ')'
+  )
+
+  p0 <- heatmap_df |>
+    ggplot(aes(x = tx_coarse, y = us_l4name, fill = mean_weighted_year)) +
+    geom_tile(color = 'white') +
+    scale_fill_viridis_c(option = 'magma', name = 'Mean\nsignificance-\nweighted year') +
+    labs(x = 'Treatment', y = 'Ecoregion', title = title_txt, subtitle = subtitle_txt) +
+    theme_bw() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1, color = 'black'),
+      axis.text.y = element_text(color = 'black')
+    )
+
+  return(p0)
+
+}
 plot_eco <- function(df, res, obj, eco = NULL, res_col = 'fun_group', obj_col = 'objective', eco_col = 'us_l4name') {
   
   require(ggplot2)

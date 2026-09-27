@@ -1,3 +1,85 @@
+get_intended_sign <- function(objective) {
+  # Single source of truth for "which raw sign of `effect` counts as the INTENDED
+  # management outcome for a given objective": +1 if the objective is an
+  # increase_* goal (a positive/increasing effect is intended), -1 if it's a
+  # decrease_* goal (a negative/decreasing effect is intended). Centralizing this
+  # here means every place that needs to translate a raw positive/negative DART
+  # effect into intended/unintended language (reduce_s0(), label_intended() below,
+  # the write-up text) agrees with every other place, rather than each re-deriving
+  # it slightly differently. See the terminology note near the top of the .Rmd:
+  # "positive"/"negative" always refers to the raw sign of the (differenced) RAP
+  # cover effect; "intended"/"unintended" always refers to that sign relative to
+  # the objective's management goal.
+  dir_word <- sub('_.*$', '', objective)
+  sign_out <- ifelse(dir_word == 'increase', 1, ifelse(dir_word == 'decrease', -1, NA_real_))
+  if (any(is.na(sign_out))) {
+    stop('get_intended_sign(): objective must start with "increase_" or "decrease_"')
+  }
+  return(sign_out)
+}
+label_intended <- function(sig, effect, objective) {
+  # Per-pixel label combining significance with intent (see get_intended_sign()):
+  # non-significant pixels get "not significant" (direction isn't meaningful for
+  # them); among significant pixels, "intended" means the effect moved the
+  # response the way the objective wanted, "unintended" means the opposite.
+  intended_sign <- get_intended_sign(objective)
+  ifelse(!sig, 'not significant', ifelse(sign(effect) == intended_sign, 'intended', 'unintended'))
+}
+se <- function(x) {
+  # Standard error of the mean. Pulled out as a named helper (rather than left
+  # inline in a single .Rmd chunk) so any chunk that summarizes a sample-level
+  # statistic across polygons can reuse the same definition.
+  sd(x, na.rm = TRUE) / sqrt(sum(!is.na(x)))
+}
+summarize_poly_sig <- function(df_in, objective_label, cover_label, col_polygon = 'polygon', col_sig = 'sig', col_effect = 'effect') {
+  # Per-polygon significance summary (mean/SD/SE of % significant, % significant
+  # positive, and % significant negative, taken across polygons rather than
+  # pixels - see the note in the .Rmd on why polygon is the right unit here).
+  # Returns ONE ROW per objective/cover combination, tagged with `objective`,
+  # `cover`, and the number of polygons that row is based on, so that calling
+  # this once per objective and `rbind()`-ing the results builds up a single
+  # expandable table as more objectives are added to the report.
+
+  require(dplyr)
+
+  poly_sig <- df_in |>
+    dplyr::group_by(.data[[col_polygon]]) |>
+    dplyr::summarise(
+      pct_sig     = 100 * mean(.data[[col_sig]]),
+      pct_sig_pos = 100 * mean(.data[[col_sig]] & .data[[col_effect]] > 0),
+      pct_sig_neg = 100 * mean(.data[[col_sig]] & .data[[col_effect]] < 0),
+      .groups = 'drop'
+    )
+
+  data.frame(
+    objective       = objective_label,
+    cover           = cover_label,
+    n_polygons      = nrow(poly_sig),
+    mean_pct_sig    = mean(poly_sig$pct_sig),
+    sd_pct_sig      = sd(poly_sig$pct_sig),
+    se_pct_sig      = se(poly_sig$pct_sig),
+    mean_pct_sig_pos = mean(poly_sig$pct_sig_pos),
+    sd_pct_sig_pos   = sd(poly_sig$pct_sig_pos),
+    se_pct_sig_pos   = se(poly_sig$pct_sig_pos),
+    mean_pct_sig_neg = mean(poly_sig$pct_sig_neg),
+    sd_pct_sig_neg   = sd(poly_sig$pct_sig_neg),
+    se_pct_sig_neg   = se(poly_sig$pct_sig_neg),
+    stringsAsFactors = FALSE
+  )
+}
+weighted_peak_year <- function(year, weight) {
+  # A significance-weighted "peak year": conceptually the weighted mean (some
+  # call this a weighted centroid, or center of mass) of the time series, using
+  # each year's significance value as its weight, so years with a stronger
+  # signal pull the estimate toward them more than years with little or none.
+  # This is exactly what base R's stats::weighted.mean() computes, so that's
+  # used directly here rather than hand-rolling sum(year * weight) / sum(weight)
+  # inline - see the .Rmd for a longer explanation of the weighting scheme and
+  # why a hard single-year peak/trough (as computed elsewhere in the report) can
+  # be too sensitive to noise in any one year.
+  if (sum(weight, na.rm = TRUE) <= 0) return(NA_real_)
+  stats::weighted.mean(year, weight, na.rm = TRUE)
+}
 split_by_objective <- function(df_in, obj_col = "objective", fun_col = "fun_group") {
   
   stopifnot(
@@ -91,7 +173,25 @@ get_summary_DART_results <- function(
     scale_x_continuous(breaks = seq(max(poly_df))) +
     theme_bw() +
     theme(axis.text = element_text(color = 'black'))
-  
+
+  # Polygon count BY YEAR SINCE TREATMENT (distinct from tbl_poly/poly_plot above,
+  # which count polygons per tx_coarse x us_l4name cell). This counts, for each
+  # year_diff, how many distinct polygons contribute at least one pixel that year -
+  # i.e. how much the pool of independent spatial replicates shrinks over the
+  # course of the time series, as polygons drop out of the post-treatment record
+  # (a different question from raw pixel count by year, since a polygon can have
+  # many or few pixels without changing how many *independent* polygons back that
+  # year's estimate).
+  df_poly_year <- df_in[, c(col_polygon, 'year_diff')]
+  df_poly_year <- df_poly_year[!duplicated(df_poly_year), ]
+  tbl_poly_year <- table(df_poly_year$year_diff)
+
+  poly_plot_year <- ggplot(as.data.frame(tbl_poly_year), aes(x = as.integer(as.character(Var1)), y = Freq)) +
+    geom_col(fill = "grey35", colour = "white", linewidth = 0.3) +
+    labs(x = "Years since treatment", y = "Number of polygons", title = "Polygon count by year since treatment") +
+    theme_bw() +
+    theme(axis.text = element_text(color = 'black'))
+
   # overall DART significance
   pix_sig_TOT <- c(
     # percent of significantly different DART pixels that show a positive effect:
@@ -112,17 +212,19 @@ get_summary_DART_results <- function(
     mutate(pix_sig_perc = round(100 * (pix_sig / pix_n), 2))
   
   return(list(
-    input         = df_in,
-    tbl_tx        = tbl_tx,
-    tbl_eco       = tbl_eco,
-    tbl_tx_eco    = tbl_tx_eco,
-    tbl_poly      = tbl_poly,
-    pixel_plot_0  = pixel_plot_0,
-    pixel_plot_1  = pixel_plot_1,
-    poly_plot     = poly_plot,
-    pix_sig_TOT   = pix_sig_TOT,
-    pix_sig_TX    = pix_sig_TX,
-    pix_sig_ECO   = pix_sig_ECO
+    input          = df_in,
+    tbl_tx         = tbl_tx,
+    tbl_eco        = tbl_eco,
+    tbl_tx_eco     = tbl_tx_eco,
+    tbl_poly       = tbl_poly,
+    tbl_poly_year  = tbl_poly_year,
+    pixel_plot_0   = pixel_plot_0,
+    pixel_plot_1   = pixel_plot_1,
+    poly_plot      = poly_plot,
+    poly_plot_year = poly_plot_year,
+    pix_sig_TOT    = pix_sig_TOT,
+    pix_sig_TX     = pix_sig_TX,
+    pix_sig_ECO    = pix_sig_ECO
   ))
   
 }
