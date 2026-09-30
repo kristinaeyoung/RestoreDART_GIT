@@ -1,0 +1,272 @@
+---
+title: "RestoreDART raw result graphs by ecoregion"
+author: "BEM"
+date: "September 2026"
+output: html_document
+---
+
+## Notes
+
+* This document is **reference material**, split out of `2_sample_size_checks.Rmd` because it is bulky: one bar-panel figure per surviving ecoregion per objective, which is the large majority of the figures the project renders. Nothing here is summarised or tested - it is the closest the report gets to showing the raw per-pixel results, with significant and non-significant pixels plotted together. For what the data can support see `2_sample_size_checks.Rmd`; for results across objectives see `2_make_DART_results.Rmd`.
+
+```{r setup, message = F, warning = F, echo = F}
+# Everything this document displays is computed in the shared setup script:
+# the input read, the three sample-size thresholds, the filters, and each
+# objective's copy of the eight tables compiled across objectives. Neither this
+# document nor 2_make_DART_results.Rmd computes anything it shows, and neither
+# sets a threshold - so a threshold change takes effect in both at once, and a
+# figure here cannot be filtered differently from the compiled table it feeds.
+#
+# `local = knitr::knit_global()` is load-bearing, not style: collect_obj_tables()
+# looks for the per-objective tables in `ls(envir = parent.frame())`, which from
+# a chunk is the knit environment, so that is where the script's objects have to
+# land.
+#
+# Section structure: one section per element of `summaries`, written out in
+# full rather than generated from a template. Each section is
+# identified by the NAME of its element (`obj_nm`), not by position -
+# split_by_objective() returns elements in the order objectives first appear in
+# the input file, so a positional index would retitle a section if the input
+# changed. The stopifnot() at the top of each section fails the render if its
+# element is absent. Chunk labels are `results-N_M`, N being the section's
+# position in this document and M the chunk counter within it; here they are
+# `raw-N_M`.
+#
+# Adding an objective means adding its rows to the input data and copying a
+# section here (change its `obj_nm` literal, renumber its chunk labels). The
+# compiled tables in 2_make_DART_results.Rmd pick it up with no edit at all,
+# because 0_DART_setup.R loops over whatever `summaries` contains - but the
+# per-objective write-up is no longer generated, so without a pasted section the
+# new objective appears in those tables with nothing describing it.
+source('0_DART_setup.R', local = knitr::knit_global())
+
+# Messages and warnings are suppressed document-wide: a stray "Loading required
+# package" or dplyr grouping message from a helper would otherwise land in the
+# body of a results section.
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+```
+
+```{r raw-1_0, echo = F}
+# Identified by element NAME, not position, for the same reason as in
+# 2_sample_size_checks.Rmd: split_by_objective() returns elements in the order
+# objectives first appear in the input file, so a literal index would retitle a
+# section if the input changed.
+obj_nm <- 'decrease_afg_AFG'
+stopifnot(obj_nm %in% names(summaries))
+r_ind <- match(obj_nm, names(summaries))
+
+.st <- obj_state[[obj_nm]]
+cur_obj   <- .st$cur_obj
+cur_cover <- .st$cur_cover
+int_word  <- .st$int_word
+uni_word  <- .st$uni_word
+
+# Post-filter data, so these figures are drawn on exactly what the compiled
+# tables and the sample-size checks are built from.
+s_0 <- summaries_mod[[r_ind]]
+```
+
+<!-- Heading placed after the chunk so it can use the name-matched `r_ind`; the
+chunk is echo = F and prints nothing, so rendered output is unaffected. -->
+### `r print_summary_name(summaries, r_ind, 5)`
+
+- The primary spatial dimension of interest is `us_l4name`, while the primary temporal dimension of interest is `year_diff`. The only relevant explanatory variable at this point in the analysis is `tx_coarse`.
+- Both significant and non-significant pixels should be plotted.
+- Only post-treatment data should be plotted.
+
+The year x treatment x ecoregion heatmap that used to open this subsection (`plot_all_DART_sig()`, "Where are treated areas significantly shifting?") has been removed. It carried the net direction of significant pixels as a diverging fill over a year x treatment grid, faceted by ecoregion, with cells under 30 pixels faded; with five objectives and up to 28 ecoregions each it was one dense panel grid per objective and the bar panels below say the same thing on axes that can be read off directly. The function is still in `plot_functions.R` and takes `metric = 'prop_sig'` as well as the default net-direction fill, so the figure can be brought back by restoring the one call at the top of the chunk below.
+
+```{r raw-1_1, echo = F}
+eco_list <- sort(unique(s_0$input$us_l4name))
+
+for (i in seq_along(eco_list)) {
+  df_eco <- s_0$input[s_0$input$us_l4name == eco_list[i], ]
+  print(
+    plot_all_DART_time(df_eco, cur_cover, cur_obj, eco_list[i])
+  )
+}
+```
+
+**Figures (bar panels, one figure per ecoregion).** X axis: years since treatment. Y axis: DART effect (Δ RAP cover), with a line at zero. Fill: whether the DART result was significant (`TRUE`/`FALSE`), the two dodged side by side within each year. Facets: coarse treatment, one panel each. One figure is drawn per ecoregion, named in the figure title along with the cover response and objective.
+
+For the `r cur_obj` objective, significant bars should generally fall on the `r int_word` side of the zero line. Significant bars on the `r uni_word` side would indicate that the treatment is not producing the intended change. Non-significant bars neither support nor refute treatment efficacy.
+
+```{r raw-2_0, echo = F}
+# Identified by element NAME, not position, for the same reason as in
+# 2_sample_size_checks.Rmd: split_by_objective() returns elements in the order
+# objectives first appear in the input file, so a literal index would retitle a
+# section if the input changed.
+obj_nm <- 'decrease_shr_SHR'
+stopifnot(obj_nm %in% names(summaries))
+r_ind <- match(obj_nm, names(summaries))
+
+.st <- obj_state[[obj_nm]]
+cur_obj   <- .st$cur_obj
+cur_cover <- .st$cur_cover
+int_word  <- .st$int_word
+uni_word  <- .st$uni_word
+
+# Post-filter data, so these figures are drawn on exactly what the compiled
+# tables and the sample-size checks are built from.
+s_0 <- summaries_mod[[r_ind]]
+```
+
+<!-- Heading placed after the chunk so it can use the name-matched `r_ind`; the
+chunk is echo = F and prints nothing, so rendered output is unaffected. -->
+### `r print_summary_name(summaries, r_ind, 5)`
+
+- The primary spatial dimension of interest is `us_l4name`, while the primary temporal dimension of interest is `year_diff`. The only relevant explanatory variable at this point in the analysis is `tx_coarse`.
+- Both significant and non-significant pixels should be plotted.
+- Only post-treatment data should be plotted.
+
+The year x treatment x ecoregion heatmap that used to open this subsection (`plot_all_DART_sig()`, "Where are treated areas significantly shifting?") has been removed. It carried the net direction of significant pixels as a diverging fill over a year x treatment grid, faceted by ecoregion, with cells under 30 pixels faded; with five objectives and up to 28 ecoregions each it was one dense panel grid per objective and the bar panels below say the same thing on axes that can be read off directly. The function is still in `plot_functions.R` and takes `metric = 'prop_sig'` as well as the default net-direction fill, so the figure can be brought back by restoring the one call at the top of the chunk below.
+
+```{r raw-2_1, echo = F}
+eco_list <- sort(unique(s_0$input$us_l4name))
+
+for (i in seq_along(eco_list)) {
+  df_eco <- s_0$input[s_0$input$us_l4name == eco_list[i], ]
+  print(
+    plot_all_DART_time(df_eco, cur_cover, cur_obj, eco_list[i])
+  )
+}
+```
+
+**Figures (bar panels, one figure per ecoregion).** X axis: years since treatment. Y axis: DART effect (Δ RAP cover), with a line at zero. Fill: whether the DART result was significant (`TRUE`/`FALSE`), the two dodged side by side within each year. Facets: coarse treatment, one panel each. One figure is drawn per ecoregion, named in the figure title along with the cover response and objective.
+
+For the `r cur_obj` objective, significant bars should generally fall on the `r int_word` side of the zero line. Significant bars on the `r uni_word` side would indicate that the treatment is not producing the intended change. Non-significant bars neither support nor refute treatment efficacy.
+
+```{r raw-3_0, echo = F}
+# Identified by element NAME, not position, for the same reason as in
+# 2_sample_size_checks.Rmd: split_by_objective() returns elements in the order
+# objectives first appear in the input file, so a literal index would retitle a
+# section if the input changed.
+obj_nm <- 'decrease_tre_TRE'
+stopifnot(obj_nm %in% names(summaries))
+r_ind <- match(obj_nm, names(summaries))
+
+.st <- obj_state[[obj_nm]]
+cur_obj   <- .st$cur_obj
+cur_cover <- .st$cur_cover
+int_word  <- .st$int_word
+uni_word  <- .st$uni_word
+
+# Post-filter data, so these figures are drawn on exactly what the compiled
+# tables and the sample-size checks are built from.
+s_0 <- summaries_mod[[r_ind]]
+```
+
+<!-- Heading placed after the chunk so it can use the name-matched `r_ind`; the
+chunk is echo = F and prints nothing, so rendered output is unaffected. -->
+### `r print_summary_name(summaries, r_ind, 5)`
+
+- The primary spatial dimension of interest is `us_l4name`, while the primary temporal dimension of interest is `year_diff`. The only relevant explanatory variable at this point in the analysis is `tx_coarse`.
+- Both significant and non-significant pixels should be plotted.
+- Only post-treatment data should be plotted.
+
+The year x treatment x ecoregion heatmap that used to open this subsection (`plot_all_DART_sig()`, "Where are treated areas significantly shifting?") has been removed. It carried the net direction of significant pixels as a diverging fill over a year x treatment grid, faceted by ecoregion, with cells under 30 pixels faded; with five objectives and up to 28 ecoregions each it was one dense panel grid per objective and the bar panels below say the same thing on axes that can be read off directly. The function is still in `plot_functions.R` and takes `metric = 'prop_sig'` as well as the default net-direction fill, so the figure can be brought back by restoring the one call at the top of the chunk below.
+
+```{r raw-3_1, echo = F}
+eco_list <- sort(unique(s_0$input$us_l4name))
+
+for (i in seq_along(eco_list)) {
+  df_eco <- s_0$input[s_0$input$us_l4name == eco_list[i], ]
+  print(
+    plot_all_DART_time(df_eco, cur_cover, cur_obj, eco_list[i])
+  )
+}
+```
+
+**Figures (bar panels, one figure per ecoregion).** X axis: years since treatment. Y axis: DART effect (Δ RAP cover), with a line at zero. Fill: whether the DART result was significant (`TRUE`/`FALSE`), the two dodged side by side within each year. Facets: coarse treatment, one panel each. One figure is drawn per ecoregion, named in the figure title along with the cover response and objective.
+
+For the `r cur_obj` objective, significant bars should generally fall on the `r int_word` side of the zero line. Significant bars on the `r uni_word` side would indicate that the treatment is not producing the intended change. Non-significant bars neither support nor refute treatment efficacy.
+
+```{r raw-4_0, echo = F}
+# Identified by element NAME, not position, for the same reason as in
+# 2_sample_size_checks.Rmd: split_by_objective() returns elements in the order
+# objectives first appear in the input file, so a literal index would retitle a
+# section if the input changed.
+obj_nm <- 'increase_pfg_PFG'
+stopifnot(obj_nm %in% names(summaries))
+r_ind <- match(obj_nm, names(summaries))
+
+.st <- obj_state[[obj_nm]]
+cur_obj   <- .st$cur_obj
+cur_cover <- .st$cur_cover
+int_word  <- .st$int_word
+uni_word  <- .st$uni_word
+
+# Post-filter data, so these figures are drawn on exactly what the compiled
+# tables and the sample-size checks are built from.
+s_0 <- summaries_mod[[r_ind]]
+```
+
+<!-- Heading placed after the chunk so it can use the name-matched `r_ind`; the
+chunk is echo = F and prints nothing, so rendered output is unaffected. -->
+### `r print_summary_name(summaries, r_ind, 5)`
+
+- The primary spatial dimension of interest is `us_l4name`, while the primary temporal dimension of interest is `year_diff`. The only relevant explanatory variable at this point in the analysis is `tx_coarse`.
+- Both significant and non-significant pixels should be plotted.
+- Only post-treatment data should be plotted.
+
+The year x treatment x ecoregion heatmap that used to open this subsection (`plot_all_DART_sig()`, "Where are treated areas significantly shifting?") has been removed. It carried the net direction of significant pixels as a diverging fill over a year x treatment grid, faceted by ecoregion, with cells under 30 pixels faded; with five objectives and up to 28 ecoregions each it was one dense panel grid per objective and the bar panels below say the same thing on axes that can be read off directly. The function is still in `plot_functions.R` and takes `metric = 'prop_sig'` as well as the default net-direction fill, so the figure can be brought back by restoring the one call at the top of the chunk below.
+
+```{r raw-4_1, echo = F}
+eco_list <- sort(unique(s_0$input$us_l4name))
+
+for (i in seq_along(eco_list)) {
+  df_eco <- s_0$input[s_0$input$us_l4name == eco_list[i], ]
+  print(
+    plot_all_DART_time(df_eco, cur_cover, cur_obj, eco_list[i])
+  )
+}
+```
+
+**Figures (bar panels, one figure per ecoregion).** X axis: years since treatment. Y axis: DART effect (Δ RAP cover), with a line at zero. Fill: whether the DART result was significant (`TRUE`/`FALSE`), the two dodged side by side within each year. Facets: coarse treatment, one panel each. One figure is drawn per ecoregion, named in the figure title along with the cover response and objective.
+
+For the `r cur_obj` objective, significant bars should generally fall on the `r int_word` side of the zero line. Significant bars on the `r uni_word` side would indicate that the treatment is not producing the intended change. Non-significant bars neither support nor refute treatment efficacy.
+
+```{r raw-5_0, echo = F}
+# Identified by element NAME, not position, for the same reason as in
+# 2_sample_size_checks.Rmd: split_by_objective() returns elements in the order
+# objectives first appear in the input file, so a literal index would retitle a
+# section if the input changed.
+obj_nm <- 'increase_shr_SHR'
+stopifnot(obj_nm %in% names(summaries))
+r_ind <- match(obj_nm, names(summaries))
+
+.st <- obj_state[[obj_nm]]
+cur_obj   <- .st$cur_obj
+cur_cover <- .st$cur_cover
+int_word  <- .st$int_word
+uni_word  <- .st$uni_word
+
+# Post-filter data, so these figures are drawn on exactly what the compiled
+# tables and the sample-size checks are built from.
+s_0 <- summaries_mod[[r_ind]]
+```
+
+<!-- Heading placed after the chunk so it can use the name-matched `r_ind`; the
+chunk is echo = F and prints nothing, so rendered output is unaffected. -->
+### `r print_summary_name(summaries, r_ind, 5)`
+
+- The primary spatial dimension of interest is `us_l4name`, while the primary temporal dimension of interest is `year_diff`. The only relevant explanatory variable at this point in the analysis is `tx_coarse`.
+- Both significant and non-significant pixels should be plotted.
+- Only post-treatment data should be plotted.
+
+The year x treatment x ecoregion heatmap that used to open this subsection (`plot_all_DART_sig()`, "Where are treated areas significantly shifting?") has been removed. It carried the net direction of significant pixels as a diverging fill over a year x treatment grid, faceted by ecoregion, with cells under 30 pixels faded; with five objectives and up to 28 ecoregions each it was one dense panel grid per objective and the bar panels below say the same thing on axes that can be read off directly. The function is still in `plot_functions.R` and takes `metric = 'prop_sig'` as well as the default net-direction fill, so the figure can be brought back by restoring the one call at the top of the chunk below.
+
+```{r raw-5_1, echo = F}
+eco_list <- sort(unique(s_0$input$us_l4name))
+
+for (i in seq_along(eco_list)) {
+  df_eco <- s_0$input[s_0$input$us_l4name == eco_list[i], ]
+  print(
+    plot_all_DART_time(df_eco, cur_cover, cur_obj, eco_list[i])
+  )
+}
+```
+
+**Figures (bar panels, one figure per ecoregion).** X axis: years since treatment. Y axis: DART effect (Δ RAP cover), with a line at zero. Fill: whether the DART result was significant (`TRUE`/`FALSE`), the two dodged side by side within each year. Facets: coarse treatment, one panel each. One figure is drawn per ecoregion, named in the figure title along with the cover response and objective.
+
+For the `r cur_obj` objective, significant bars should generally fall on the `r int_word` side of the zero line. Significant bars on the `r uni_word` side would indicate that the treatment is not producing the intended change. Non-significant bars neither support nor refute treatment efficacy.
