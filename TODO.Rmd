@@ -18,7 +18,7 @@ exists and what is still missing, and items with no coverage carry an *Outstandi
 note. A few items resolved by a decision to **not** do the work are struck as well,
 with the note recording where that decision is documented.
 
-**How locations are cited.** The earlier version of this list gave line numbers in a
+**How locations are cited.** ~~The earlier version of this list gave line numbers in a
 single 716-line `2_make_DART_results.Rmd`. That file no longer exists in that form: the
 report has been split into a driver (`2_make_DART_results.Rmd` - setup, constants, the
 cross-objective compilation chunks and the hand-written interpretation) and a template
@@ -29,7 +29,21 @@ once per objective - so every note below cites a **file and chunk label** instea
 Template chunk labels come out as `results-X_Y`, where `X` is the objective's index and
 `Y` counts chunks within that objective's block from 0; a note that says
 `_objective_block.Rmd`, chunk `results-X_18` means that chunk in every objective's
-section. Chunk labels are stable under editing in a way line numbers are not.
+section. Chunk labels are stable under editing in a way line numbers are not.~~
+
+*Superseded, September 2026. The template architecture is gone: `knit_expand()` /
+`knit_child()` were dropped, the five per-objective sections were written out in full
+into `2_sample_size_checks.Rmd`, the bulky per-ecoregion panels moved to
+`2_raw_result_graphs.Rmd`, and all shared computation moved into `0_DART_setup.R`, which
+both documents source. Notes below still cite file plus chunk label, which remains the
+right convention, but two things in those citations are stale and have not been
+rewritten: any note naming `_objective_block.Rmd` now means the corresponding section of
+`2_sample_size_checks.Rmd` (23 such citations), and the label mapping has changed -
+`results-X_Y` is now `results-N_M` with `N` the section's position 1-5, the sequence
+running `_0` and `_3`-`_20` (`_1` and `_2` were deleted pre-filter count tables), plus
+`results-N_summary` and `results-N_interp`. Old `_22` (overlap) is now `_8`, old
+`_18`-`_21` are `_17`-`_20`, and old `_17` (the per-ecoregion loop) left the document
+entirely and is `raw-N_1` in `2_raw_result_graphs.Rmd`.*
 
 The report now covers **five** objective x cover response combinations, not one:
 `decrease_afg` (AFG), `decrease_shr` (SHR), `decrease_tre` (TRE), `increase_pfg` (PFG)
@@ -42,6 +56,11 @@ of publication graphics) is a standing priority note rather than a task. The fou
 outstanding items are the model `.Rmd` split, time metrics in the summary table, a
 stability-over-time metric, and re-checking the written interpretations against the
 figures that were reoriented from raw-positive to intended in this revision.
+*Revised 30 September: the last of those four is now partly addressed - see its item
+below - and the model split turns out not to be executable from this directory at all,
+for the reason recorded against it. The spreadsheet item is closed the other way, by
+retiring `table_restoredart_template.xlsx` rather than filling it, so the compiled
+summary table is now the deliverable draft and its columns are defined in the driver.*
 
 **Closed since the last revision of this list.** The largest one is the **late-year
 sample-size cut-off**, which had been the longest-standing outstanding item and is now
@@ -81,10 +100,23 @@ should be restated wherever those results are presented.
 
 ## Reporting and document structure
 
-- **Fill out `table_restoredart_template.xlsx`.** This is the summary table requested
+- ~~**Fill out `table_restoredart_template.xlsx`.**~~ This is the summary table requested
   by email and is the primary near-term deliverable.
+
+  *Closed 30 September 2026, by retiring the template rather than by filling it. BEM's
+  call: the template had exceeded its usefulness, and the compiled summary table is now
+  the working draft of the deliverable in its own right. `summary_template_map()`,
+  `map_summary_to_template()`, the reshaped `2_DART_results_summary_table_template.csv`
+  and the prose describing them are all removed; `write_csv` now writes nine tables, not
+  ten. In their place, the driver carries a bulleted definition of every column of
+  `summary_table` immediately above that chunk, including the two things the mapping had
+  obscured: `grp_perc_int` / `grp_perc_uni` are shares of significant pixels rather than
+  of all pixels, and a cell with no significant pixels renders `NaN` in both (two such
+  rows in the current draft). The dependency question - `writexl` or `openxlsx` - is moot
+  and neither was added. The notes below remain as the record of what the mapping was.*
   *Partly addressed, and now one manual step from done. The table is built per objective
-  in `_objective_block.Rmd`, chunk `results-X_23`, with the requested column set -
+  by the loop in `0_DART_setup.R` (it was chunk `results-X_23` of the retired
+  `_objective_block.Rmd`), with the requested column set -
   objective and treatment share columns, ecoregion, pixel and polygon counts, and
   intended/unintended significant-pixel counts and percentages - stacked across all five
   objectives by `collect_obj_tables('summary_tbl_')` in the driver's `compile_tables`
@@ -117,6 +149,12 @@ should be restated wherever those results are presented.
   a dependency without asking. Pasting one column block into the template by hand is the
   alternative, and with the columns already in the template's order that is a single
   paste.*
+
+  ~~*30 September: both guesses have been put to BEM as an explicit question, together with
+  the choice between adding `writexl`/`openxlsx` and continuing to paste the .csv. Until
+  that comes back the mapping stands as it is, and this item is blocked on a decision
+  rather than on work.*~~ *Answered the same day by retiring the template - see the note
+  at the head of this item.*
 - **Split the models into their own `.Rmd`.** The model fitting and the results
   summaries are too much material for a single document; move the model code and
   model diagnostics into a separate `.Rmd` so that each document has one purpose.
@@ -128,6 +166,17 @@ should be restated wherever those results are presented.
   different: `weight_testing_summary.Rmd` is a separate document with its own output,
   whereas `_objective_block.Rmd` is a child template with no YAML header, rendered into
   the parent. The models want the first pattern, not the second.*
+
+  *30 September, and this is the thing to know before picking the item up again: there is
+  no model code in `claude_visible` to split. `0_DART_setup.R`, `helper_functions.R`,
+  `plot_functions.R` and the three `.Rmd` files contain no model fitting and no
+  diagnostics - no `lm()`, `glm()`, `lme4`, `glmmTMB` or residual code anywhere - because
+  the mixed models run upstream and `1_combined_filter_input_data_06192026.csv` is their
+  output. So the task is not a split of this code but an import of the model scripts
+  from wherever they live, plus a new document for them. The precedent to follow is still
+  the first pattern above, and the 21 input columns this report deliberately does not
+  read (CI bounds, coordinates, `year_RAP`/`year_tx`, the covariates, `tx_fine`, the
+  binary treatment indicators) are exactly what that document would need.*
 - ~~**Weighting the time series.**~~ *Settled: weighting the time-series summaries was
   checked and determined not to be helpful, so nothing in the report is weighted. The
   analysis behind that decision is in `weight_testing_summary.Rmd`.*
@@ -148,6 +197,15 @@ should be restated wherever those results are presented.
   comparable only within a section - the compiled tables still use the raw sign, so a
   per-section and a compiled figure for the same objective are no longer the same
   quantity and for a `decrease_*` objective are close to complements.*
+
+  *Partly addressed, 30 September. Each objective's `interp_text` vector now carries
+  model-generated bullets (marked `CLAUDE:`) written against the figures and tables as
+  they currently stand, on the intended basis, so the evidence has been re-read even
+  where the older bullets have not been rewritten. The `Uinta Basin Floor` remark
+  specifically is answered: that ecoregion holds 1,008 of this objective's 84,175 pixels,
+  1.2% of it, so the 25.79% intended rate is a small-cell rate and the pixel-weighted
+  rate for the objective is 5.4%. What is still outstanding is the original bullets
+  themselves - they are BEM's text and have been left exactly as written.*
 - **De-prioritise final publication graphics.** Figures intended for publication, and
   the polishing that goes with them, are explicitly lower priority than getting the
   summary tables and time-effect results settled. *Standing priority note rather than a
@@ -559,3 +617,82 @@ management goal.
   by 16+), while its largest mean effects fall at years 29 and 31 on 100 and 27
   significant pixels - so the objective with the most reliable detection rate has its
   headline effect sizes in the sparsest part of its record.*
+
+
+## Carried in from the 29 September task list
+
+These are the *Open questions* and *Also worth knowing* items from `next_tasks.md`, moved
+here so the task list is the single place they live. The four closeable items from that
+same list are recorded under *Closed 30 September* below.
+
+- **There is no per-year x direction sample-size guard.** `truncate_late_years()` counts
+  significant pixels across *both* directions, so a peak computed from a single
+  significant pixel in one direction survives the filter. `decrease_shr`'s positive peak
+  currently does: 14.20 at year 33, backed by one pixel, with no SE. A guard inside
+  `mean_effect_by_year()` is the sharper instrument and does not exist.
+  *Outstanding, and now footnoted rather than fixed: the `CLAUDE:` bullet in that
+  objective's interpretation says in as many words that the peak is a single-pixel
+  artefact and should be ignored, and the cross-objective interpretation records that 4
+  of the 10 compiled peak rows rest on fewer than 50 significant pixels. Deciding between
+  building the guard and keeping the footnote is still open. Note that the thin-pixel
+  problem is not flagged anywhere in the tables themselves - only in prose.*
+- ~~**Fill the interpretation gaps.**~~ *Addressed, 30 September. `decrease_tre` had a
+  placeholder and no bullets and `decrease_shr` said "needs more details"; both now carry
+  five `CLAUDE:`-marked bullets built with `sprintf()` from the objects their own section
+  computes, as do the other three objectives. The placeholder lines themselves were left
+  in place, since they mark text BEM still intends to write.*
+- **Decide how renders should deliver their CSVs.** `out_dir` (`../../results`) is not a
+  host mount, so a sandbox render writes all ten CSVs into sandbox-local storage and they
+  are discarded. Either grant `/home/bem/Documents/RestoreDART/results` so that sandbox
+  renders deliver, or keep rendering in RStudio and treat sandbox renders as verification
+  only. *Outstanding, and it gates the spreadsheet item above, which needs one of those
+  CSVs.*
+- ~~**Decide whether `2_sample_size_checks.Rmd` keeps its name.**~~ Only two of its five
+  subsection groups are sample-size material; the rest is per-objective results and
+  interpretation, so a collaborator opening it will not expect the peak-effect analysis
+  to be there. `2_per_objective_detail.Rmd` was the suggested alternative. *Settled 30
+  September: BEM confirmed the name stands. Do not raise it again - it had been offered
+  three times by then.*
+
+## Also worth knowing, but not tasks
+
+- Six figures in `helper_functions.R` still inline `theme_bw() + theme(axis.text =
+  element_text(color = 'black'))` and `fill = 'grey35'` rather than reading
+  `fig_conventions()`: the four in `get_summary_DART_results()`, the fill bar in
+  `compare_related_directions()` and the ranked bar in `summarize_sig_effect()`. They
+  agree with `$theme$base` and `$col$neutral` by value, so nothing looks wrong. BEM has
+  said not to worry about it.
+- A full render is now three documents, about 6 min 51 s in total (128 s + 129 s + 154 s,
+  each paying its own ~47 s read of the 3.25 GB input file). `dart_check_rmd()`
+  parse-checks the live sources in under a second and is the right first move after any
+  edit.
+- Figure parity, not table parity, is the invariant worth checking after a restructure:
+  124 figures across the three documents, unchanged through every round. The table total
+  is deliberately 91 (11 + 80 + 0), no longer the pre-split 95.
+
+## Closed 30 September
+
+- ~~**Rename the `Results after dropping (treatment x ecoregion)` heading.**~~ *It named
+  only the spatial cell filter while the prose beneath it reported the combined cost of
+  all three, and the new `Summary statistics` subsection repeated those numbers. Now
+  `##### Results after all three filters` in all five sections, with the five prose
+  cross-references updated to match.*
+- ~~**Convert `2_make_DART_results.Rmd`'s Notes to the reader-facing convention.**~~
+  *Its four original bullets are now three reader-facing ones plus a document-order
+  bullet; the `<prefix><objective>_<COVER>` naming, what `collect_obj_tables()` does with
+  it, and what adding an objective takes have moved into the setup chunk's comments,
+  where the other two documents already keep that material.*
+- ~~**Settle the time-effect results.**~~ *Addressed as interpretation rather than as new
+  analysis, which is what the item asked for. Each objective's section carries five
+  bullets covering its own time evidence, and the driver's `### Interpretation` now has
+  an `interp_stats` chunk plus ten `CLAUDE:`-marked bullets under *Across all
+  objectives*, *Time since treatment* and *Caveats and open questions*. The finding that
+  generalises: the overall significance rate falls in every successive year bin in all
+  five objectives and the intended rate does too, ending at 38-61% of its years 1-5
+  value, while what the unintended rate does alongside it differs by objective - it ends
+  higher for `decrease_tre` and `increase_pfg` only. Peak-magnitude timing is the weakest
+  evidence in the report and the bullets say so.*
+- ~~**Delete `_objective_block.Rmd`.**~~ *Retired, referenced by nothing, and figure
+  parity verified twice at 124. Removed 30 September. Its content is the five written-out
+  sections of `2_sample_size_checks.Rmd`; the 23 citations to it in this list are stale
+  and are flagged in the header note above rather than rewritten.*

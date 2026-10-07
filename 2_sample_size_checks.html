@@ -1097,8 +1097,8 @@ combination, giving its significant pixel count, its total pixel count,
 and the resulting percentage. Compare against the overall rate reported
 further down to see whether the dropped cells were unusual.</p>
 </div>
-<div id="results-after-dropping-treatment-x-ecoregion" class="section level5">
-<h5>Results after dropping (treatment x ecoregion)</h5>
+<div id="results-after-all-three-filters" class="section level5">
+<h5>Results after all three filters</h5>
 <p>The pixel cutoff for each (treatment × ecoregion) combination was
 300.</p>
 <p>Three filters have now been applied to this objective x cover
@@ -2123,8 +2123,8 @@ under <em>Interpretation</em> at the end of the report.</p>
 <h5>Summary statistics</h5>
 <p>What the three sample-size filters cost this objective x cover
 response, in one row - the same quantities reported in prose under
-<em>Results after dropping</em> above, gathered here so that this
-subsection stands on its own. The identical row appears in the
+<em>Results after all three filters</em> above, gathered here so that
+this subsection stands on its own. The identical row appears in the
 cross-objective filtering log in <code>2_make_DART_results.Rmd</code>,
 where it can be read against the other objectives.</p>
 <table style="width:100%;">
@@ -2204,6 +2204,38 @@ environmental context, or an expert eye. For example I don’t have enough
 personal knowledge to guess why <code>Uinta Basin Floor</code> was so
 much higher than the other ecoregions.”</li>
 <li>Treatment was generally not successful.</li>
+<li>CLAUDE: The unintended direction dominates by a factor of 4.2 (22.7%
+of pixels unintended against 5.4% intended), and it dominates in
+<em>every</em> year bin: the ratio narrows from 5.1:1 in years 1-5 to
+2.2:1 at 16+ but never reverses. So the result is not an early transient
+that later resolves - it is the standing pattern for this objective
+across the whole record.</li>
+<li>CLAUDE: The compound-objective explanation offered above is
+consistent with the overlap structure: only 5.68% of these pixels carry
+no other objective, while 79.17% also carry <code>increase_pfg</code>.
+This section is therefore not an independent sample - it is largely the
+same ground the other objectives report, read against a different
+goal.</li>
+<li>CLAUDE: The ecoregion spread is driven by small cells and should be
+read as a hypothesis-generating list, not a ranking. The top ecoregion
+(<code>Uinta Basin Floor</code>, 25.79% intended) holds 1,008 pixels,
+1.2% of this objective’s 84,175, while the pixel-weighted rate for the
+objective as a whole is 5.4%. Any statement about the objective should
+quote the weighted rate.</li>
+<li>CLAUDE: Within the treatment axis the ordering is interpretable even
+if the levels are heterogeneous: <code>vegetation removal</code> ranks
+first at 14.06% intended, with 1 of 6 treatments above 10%, and the
+largest treatment by area - <code>seeding</code>, 27,645 pixels -
+returns 1.87%. Where intended reductions in annual grass did occur they
+involved physically removing or disturbing vegetation rather than
+seeding alone.</li>
+<li>CLAUDE: Do not read timing off the peak-magnitude table for this
+objective. The intended peak (-43.3 at year 18) rests on 132 significant
+pixels and the unintended peak (28.8 at year 25) on 10, both late in a
+record truncated at year 27. The per-polygon peak-significance years are
+early by contrast (treatment means of 2.8-6.2 years), so the
+<em>frequency</em> of a significant effect peaks early and decays while
+the large late means come from very few pixels.</li>
 </ul>
 <!-- The heading follows this chunk rather than preceding it, so that it can use the
 name-matched `r_ind` instead of a literal position: knitr evaluates inline R in document
@@ -2654,8 +2686,8 @@ combination, giving its significant pixel count, its total pixel count,
 and the resulting percentage. Compare against the overall rate reported
 further down to see whether the dropped cells were unusual.</p>
 </div>
-<div id="results-after-dropping-treatment-x-ecoregion-1" class="section level5">
-<h5>Results after dropping (treatment x ecoregion)</h5>
+<div id="results-after-all-three-filters-1" class="section level5">
+<h5>Results after all three filters</h5>
 <p>The pixel cutoff for each (treatment × ecoregion) combination was
 300.</p>
 <p>Three filters have now been applied to this objective x cover
@@ -3660,8 +3692,8 @@ under <em>Interpretation</em> at the end of the report.</p>
 <h5>Summary statistics</h5>
 <p>What the three sample-size filters cost this objective x cover
 response, in one row - the same quantities reported in prose under
-<em>Results after dropping</em> above, gathered here so that this
-subsection stands on its own. The identical row appears in the
+<em>Results after all three filters</em> above, gathered here so that
+this subsection stands on its own. The identical row appears in the
 cross-objective filtering log in <code>2_make_DART_results.Rmd</code>,
 where it can be read against the other objectives.</p>
 <table style="width:100%;">
@@ -3730,6 +3762,38 @@ ecoregion, against a per-cell threshold of 300.</p>
 <li>Treatment looked successful, but at a smaller magnitude than the
 other objectives</li>
 <li>needs more details</li>
+<li>CLAUDE: The frequency evidence supports the reading above: the
+intended direction outnumbers the unintended one 2.2:1 (10.3% against
+4.7%), the second-narrowest margin among the four objectives whose
+result went in the intended direction, and the intended peak mean effect
+is -21.4 in Δ RAP cover units at year 1 (n = 2455 significant
+pixels).</li>
+<li>CLAUDE: The objective-level rate is effectively one treatment’s rate
+on one ecoregion. <code>prescribed burn</code> carries 124,020 of the
+186,596 pixels (66%) at 8.65% intended, and
+<code>Semiarid Benchlands and Canyonlands</code> carries 132,266 (71%)
+at 8.79%; the higher rates in those tables - <code>seeding</code> at
+24.15% and <code>Sagebrush Basins and Slopes</code> at 29.45% - each sit
+on a few percent of the pixels. The 10.3% headline should be attributed
+accordingly rather than read as a general result for shrub
+reduction.</li>
+<li>CLAUDE: The response is immediate and then erodes rather than
+building: the intended peak falls at year 1, the earliest of any
+objective, and the intended rate declines monotonically from 17.32% in
+years 1-5 to 6.54% at 16+. Nothing here suggests a lagged shrub
+reduction.</li>
+<li>CLAUDE: Ignore the unintended peak of 14.2 at year 27 - it is backed
+by n = 1 significant pixels and has no SE, so it is a single-pixel
+artefact of averaging over significant pixels only, not a late reversal.
+The late-year truncation at year 33 does not catch it, because that
+filter counts across both directions.</li>
+<li>CLAUDE: This objective has the thinnest polygon base of the five -
+61 polygons across 11 treatments, with up to 50% of a treatment’s
+polygons censored at their last observed year - so the per-polygon
+peak-year summaries are indicative only. 95.41% of its pixels carry
+another objective (85.21% also <code>increase_pfg</code>), which means
+the shrub reduction cannot be separated from the treatments those
+objectives describe.</li>
 </ul>
 <!-- The heading follows this chunk rather than preceding it, so that it can use the
 name-matched `r_ind` instead of a literal position: knitr evaluates inline R in document
@@ -4081,8 +4145,8 @@ combination, giving its significant pixel count, its total pixel count,
 and the resulting percentage. Compare against the overall rate reported
 further down to see whether the dropped cells were unusual.</p>
 </div>
-<div id="results-after-dropping-treatment-x-ecoregion-2" class="section level5">
-<h5>Results after dropping (treatment x ecoregion)</h5>
+<div id="results-after-all-three-filters-2" class="section level5">
+<h5>Results after all three filters</h5>
 <p>The pixel cutoff for each (treatment × ecoregion) combination was
 10.</p>
 <p>Three filters have now been applied to this objective x cover
@@ -5340,8 +5404,8 @@ under <em>Interpretation</em> at the end of the report.</p>
 <h5>Summary statistics</h5>
 <p>What the three sample-size filters cost this objective x cover
 response, in one row - the same quantities reported in prose under
-<em>Results after dropping</em> above, gathered here so that this
-subsection stands on its own. The identical row appears in the
+<em>Results after all three filters</em> above, gathered here so that
+this subsection stands on its own. The identical row appears in the
 cross-objective filtering log in <code>2_make_DART_results.Rmd</code>,
 where it can be read against the other objectives.</p>
 <table style="width:100%;">
@@ -5408,6 +5472,40 @@ ecoregion, against a per-cell threshold of 10.</p>
 <h5>Interpretation</h5>
 <ul>
 <li>To be written.</li>
+<li>CLAUDE: This is the strongest and cleanest result in the report. The
+intended direction outnumbers the unintended one 5.6:1 (25.6% against
+4.6%) on the largest pixel base of the five (556,499), and it is the
+only objective where a substantial share of pixels - 38.12% - carries no
+other objective, so it is the one result that is close to an independent
+sample.</li>
+<li>CLAUDE: Read its covariate tables with the threshold in mind. This
+objective’s per-cell floor is 10 pixels against 300 for the other four,
+and no cell, level or year was dropped (0.00% of pixels lost), so its
+treatment and ecoregion tables retain cells the other sections would
+have removed - the smallest surviving ecoregion row is 16 pixels. The
+extreme rates at the top of the ecoregion table are those cells; the
+pixel-weighted rate is 25.6%.</li>
+<li>CLAUDE: The treatment ordering is the clearest management signal in
+the document. Every combination of seeding with mechanical work sits at
+the top - <code>seeding;vegetation removal</code> leads at 51.44%
+intended - while <code>prescribed burn</code> alone returns 11.59% on
+154,865 pixels (rank 11 of 13) and the largest treatment by area,
+<code>vegetation removal</code> (218,327 pixels), returns 22.89%.
+Mechanical removal paired with seeding is 2.2 times the intended rate of
+removal alone and 4.4 times the rate of burning.</li>
+<li>CLAUDE: The decay through time is the one finding that generalises
+across all five objectives, though what the unintended rate does
+alongside it differs: here the intended rate falls from 34.73% in years
+1-5 to 11.89% at 16+ while the unintended rate rises from 2.82% to
+6.88%, so the intended-to-unintended ratio collapses from 12:1 to 1.7:1.
+Detectable tree-cover reduction is a property of the first decade after
+treatment.</li>
+<li>CLAUDE: The peak means are late (-26.6 at year 29 intended, 14.2 at
+year 31 unintended) but rest on 100 and 27 significant pixels against
+556,499 in total, and no year was truncated here, so the tail of the
+record is retained at very small per-year samples. Treat the peak years
+as poorly determined and lean on the year-bin table for timing
+instead.</li>
 </ul>
 <!-- The heading follows this chunk rather than preceding it, so that it can use the
 name-matched `r_ind` instead of a literal position: knitr evaluates inline R in document
@@ -6469,8 +6567,8 @@ combination, giving its significant pixel count, its total pixel count,
 and the resulting percentage. Compare against the overall rate reported
 further down to see whether the dropped cells were unusual.</p>
 </div>
-<div id="results-after-dropping-treatment-x-ecoregion-3" class="section level5">
-<h5>Results after dropping (treatment x ecoregion)</h5>
+<div id="results-after-all-three-filters-3" class="section level5">
+<h5>Results after all three filters</h5>
 <p>The pixel cutoff for each (treatment × ecoregion) combination was
 300.</p>
 <p>Three filters have now been applied to this objective x cover
@@ -7887,8 +7985,8 @@ under <em>Interpretation</em> at the end of the report.</p>
 <h5>Summary statistics</h5>
 <p>What the three sample-size filters cost this objective x cover
 response, in one row - the same quantities reported in prose under
-<em>Results after dropping</em> above, gathered here so that this
-subsection stands on its own. The identical row appears in the
+<em>Results after all three filters</em> above, gathered here so that
+this subsection stands on its own. The identical row appears in the
 cross-objective filtering log in <code>2_make_DART_results.Rmd</code>,
 where it can be read against the other objectives.</p>
 <table style="width:100%;">
@@ -7964,6 +8062,35 @@ environmental context, or an expert eye.</li>
 20 YST) but then become negative after that, indicating a potential
 regression of treatment effects</li>
 <li>Treatment looked generally successful</li>
+<li>CLAUDE: The largest base in the report (605,946 pixels, 539
+polygons) and the second-strongest margin: 20.7% intended against 3.8%
+unintended, 5.4:1.</li>
+<li>CLAUDE: The regression noted above is visible in the year bins, but
+as two separate movements rather than a sign flip: the intended rate
+falls from 27.84% in years 1-5 to 10.94% at 16+ while the unintended
+rate <em>rises</em> from 3.52% to 6.01%, so the ratio collapses from
+7.9:1 to 1.8:1. The magnitude side agrees - the unintended peak mean
+sits at year 21 (-10.6, n = 733 significant pixels). Stating it as decay
+plus a real accumulation of opposite-sign pixels is better supported
+than stating it as an average that turns negative.</li>
+<li>CLAUDE: The intended peak of 23.4 at year 33 is flagged censored and
+rests on 17 significant pixels - the only censored peak in the document.
+It cannot be read as a late resurgence; it marks the end of the
+analysable series for that direction.</li>
+<li>CLAUDE: The treatment ordering repeats <code>decrease_tre</code>’s,
+which is the cross-objective pattern worth reporting:
+<code>seeding;vegetation removal</code> leads at 39.94% intended, the
+largest treatment by area (<code>seeding;soil disturbance</code>,
+165,121 pixels) returns 28.53%, and <code>prescribed burn</code> sits at
+9.70% on 155,032 pixels (rank 10 of 12). Adding mechanical disturbance
+to seeding roughly doubles the intended rate; burning with or before
+seeding does not.</li>
+<li>CLAUDE: On the ecoregion axis, the environmental context asked for
+above should start from the fact that the top cell is small:
+<code>High Elevation Carbonate Mountains</code> at 87.13% intended holds
+1,974 pixels, 0.3% of the objective. The ordering is informative at the
+large end (<code>Semiarid Benchlands and Canyonlands</code>, 229,443
+pixels, 17.59%) and noisy at both extremes.</li>
 </ul>
 <!-- The heading follows this chunk rather than preceding it, so that it can use the
 name-matched `r_ind` instead of a literal position: knitr evaluates inline R in document
@@ -9012,8 +9139,8 @@ combination, giving its significant pixel count, its total pixel count,
 and the resulting percentage. Compare against the overall rate reported
 further down to see whether the dropped cells were unusual.</p>
 </div>
-<div id="results-after-dropping-treatment-x-ecoregion-4" class="section level5">
-<h5>Results after dropping (treatment x ecoregion)</h5>
+<div id="results-after-all-three-filters-4" class="section level5">
+<h5>Results after all three filters</h5>
 <p>The pixel cutoff for each (treatment × ecoregion) combination was
 300.</p>
 <p>Three filters have now been applied to this objective x cover
@@ -10309,8 +10436,8 @@ under <em>Interpretation</em> at the end of the report.</p>
 <h5>Summary statistics</h5>
 <p>What the three sample-size filters cost this objective x cover
 response, in one row - the same quantities reported in prose under
-<em>Results after dropping</em> above, gathered here so that this
-subsection stands on its own. The identical row appears in the
+<em>Results after all three filters</em> above, gathered here so that
+this subsection stands on its own. The identical row appears in the
 cross-objective filtering log in <code>2_make_DART_results.Rmd</code>,
 where it can be read against the other objectives.</p>
 <table style="width:100%;">
@@ -10380,6 +10507,41 @@ ecoregion, against a per-cell threshold of 300.</p>
 <li>Time effects are negative immediately after treatment, then stay
 generally positive</li>
 <li>Treatment looked generally successful.</li>
+<li>CLAUDE: Call this the weakest of the four objectives that came out
+in the intended direction rather than a straightforward success: 14.9%
+intended against 8.6% unintended is only 1.7:1, so roughly a third of
+the significant pixels moved the wrong way.</li>
+<li>CLAUDE: The knock-down-then-recover reading above is the
+best-supported timing statement in the report, because both sides of it
+rest on large samples: the unintended peak is at year 2 (-11.9, n = 2907
+significant pixels, the largest count behind any peak in the document)
+against an intended peak at year 20 (14.0, n = 378). The year bins agree
+- the unintended rate falls from 11.20% to 6.73% across the record while
+the intended rate falls more slowly, 17.98% to 11.01%.</li>
+<li>CLAUDE: This objective is not an independent sample in any
+meaningful sense - 0.88% of its pixels carry no other objective and
+89.03% also carry <code>increase_pfg</code>. It is best reported as the
+shrub-response arm of the same treatments <code>increase_pfg</code>
+describes. It also shares 16.53% of its pixels with
+<code>decrease_afg</code>, whose unintended positive result is the
+opposite reading of overlapping ground.</li>
+<li>CLAUDE: The treatment ordering does <em>not</em> repeat the pattern
+seen for <code>increase_pfg</code> and <code>decrease_tre</code>, and
+that is worth stating as a difference rather than smoothing over. The
+top rate (<code>soil disturbance</code>, 32.24%) sits on only 2,100
+pixels, and the two largest treatments diverge the wrong way:
+<code>seeding</code> at 82,001 pixels returns 15.35% while
+<code>seeding;soil disturbance</code> at 77,788 pixels returns 12.37%.
+Adding soil disturbance to seeding does not help shrub recovery the way
+it helps perennial grass. <code>prescribed burn</code> is again near the
+bottom (7.38%, rank 11 of 12).</li>
+<li>CLAUDE: The top ecoregion here
+(<code>High Elevation Carbonate Mountains</code>, 76.80% intended on
+1,974 pixels) is the same cell that tops <code>increase_pfg</code>, so
+one small high-elevation area drives the best result for both shrub and
+perennial-grass increase. Confirming it is a real effect rather than a
+sampling artefact needs either the environmental context or more pixels
+from that ecoregion.</li>
 </ul>
 <hr />
 </div>
@@ -10534,6 +10696,38 @@ environmental context, or an expert eye. For example I don’t have enough
 personal knowledge to guess why <code>Uinta Basin Floor</code> was so
 much higher than the other ecoregions.”</li>
 <li>Treatment was generally not successful.</li>
+<li>CLAUDE: The unintended direction dominates by a factor of 4.2 (22.7%
+of pixels unintended against 5.4% intended), and it dominates in
+<em>every</em> year bin: the ratio narrows from 5.1:1 in years 1-5 to
+2.2:1 at 16+ but never reverses. So the result is not an early transient
+that later resolves - it is the standing pattern for this objective
+across the whole record.</li>
+<li>CLAUDE: The compound-objective explanation offered above is
+consistent with the overlap structure: only 5.68% of these pixels carry
+no other objective, while 79.17% also carry <code>increase_pfg</code>.
+This section is therefore not an independent sample - it is largely the
+same ground the other objectives report, read against a different
+goal.</li>
+<li>CLAUDE: The ecoregion spread is driven by small cells and should be
+read as a hypothesis-generating list, not a ranking. The top ecoregion
+(<code>Uinta Basin Floor</code>, 25.79% intended) holds 1,008 pixels,
+1.2% of this objective’s 84,175, while the pixel-weighted rate for the
+objective as a whole is 5.4%. Any statement about the objective should
+quote the weighted rate.</li>
+<li>CLAUDE: Within the treatment axis the ordering is interpretable even
+if the levels are heterogeneous: <code>vegetation removal</code> ranks
+first at 14.06% intended, with 1 of 6 treatments above 10%, and the
+largest treatment by area - <code>seeding</code>, 27,645 pixels -
+returns 1.87%. Where intended reductions in annual grass did occur they
+involved physically removing or disturbing vegetation rather than
+seeding alone.</li>
+<li>CLAUDE: Do not read timing off the peak-magnitude table for this
+objective. The intended peak (-43.3 at year 18) rests on 132 significant
+pixels and the unintended peak (28.8 at year 25) on 10, both late in a
+record truncated at year 27. The per-polygon peak-significance years are
+early by contrast (treatment means of 2.8-6.2 years), so the
+<em>frequency</em> of a significant effect peaks early and decays while
+the large late means come from very few pixels.</li>
 </ul>
 </div>
 <div id="cover-shr-objective-decrease-shr-1" class="section level4">
@@ -10542,12 +10736,78 @@ much higher than the other ecoregions.”</li>
 <li>Treatment looked successful, but at a smaller magnitude than the
 other objectives</li>
 <li>needs more details</li>
+<li>CLAUDE: The frequency evidence supports the reading above: the
+intended direction outnumbers the unintended one 2.2:1 (10.3% against
+4.7%), the second-narrowest margin among the four objectives whose
+result went in the intended direction, and the intended peak mean effect
+is -21.4 in Δ RAP cover units at year 1 (n = 2455 significant
+pixels).</li>
+<li>CLAUDE: The objective-level rate is effectively one treatment’s rate
+on one ecoregion. <code>prescribed burn</code> carries 124,020 of the
+186,596 pixels (66%) at 8.65% intended, and
+<code>Semiarid Benchlands and Canyonlands</code> carries 132,266 (71%)
+at 8.79%; the higher rates in those tables - <code>seeding</code> at
+24.15% and <code>Sagebrush Basins and Slopes</code> at 29.45% - each sit
+on a few percent of the pixels. The 10.3% headline should be attributed
+accordingly rather than read as a general result for shrub
+reduction.</li>
+<li>CLAUDE: The response is immediate and then erodes rather than
+building: the intended peak falls at year 1, the earliest of any
+objective, and the intended rate declines monotonically from 17.32% in
+years 1-5 to 6.54% at 16+. Nothing here suggests a lagged shrub
+reduction.</li>
+<li>CLAUDE: Ignore the unintended peak of 14.2 at year 27 - it is backed
+by n = 1 significant pixels and has no SE, so it is a single-pixel
+artefact of averaging over significant pixels only, not a late reversal.
+The late-year truncation at year 33 does not catch it, because that
+filter counts across both directions.</li>
+<li>CLAUDE: This objective has the thinnest polygon base of the five -
+61 polygons across 11 treatments, with up to 50% of a treatment’s
+polygons censored at their last observed year - so the per-polygon
+peak-year summaries are indicative only. 95.41% of its pixels carry
+another objective (85.21% also <code>increase_pfg</code>), which means
+the shrub reduction cannot be separated from the treatments those
+objectives describe.</li>
 </ul>
 </div>
 <div id="cover-tre-objective-decrease-tre-1" class="section level4">
 <h4>cover: TRE , objective: decrease tre</h4>
 <ul>
 <li>To be written.</li>
+<li>CLAUDE: This is the strongest and cleanest result in the report. The
+intended direction outnumbers the unintended one 5.6:1 (25.6% against
+4.6%) on the largest pixel base of the five (556,499), and it is the
+only objective where a substantial share of pixels - 38.12% - carries no
+other objective, so it is the one result that is close to an independent
+sample.</li>
+<li>CLAUDE: Read its covariate tables with the threshold in mind. This
+objective’s per-cell floor is 10 pixels against 300 for the other four,
+and no cell, level or year was dropped (0.00% of pixels lost), so its
+treatment and ecoregion tables retain cells the other sections would
+have removed - the smallest surviving ecoregion row is 16 pixels. The
+extreme rates at the top of the ecoregion table are those cells; the
+pixel-weighted rate is 25.6%.</li>
+<li>CLAUDE: The treatment ordering is the clearest management signal in
+the document. Every combination of seeding with mechanical work sits at
+the top - <code>seeding;vegetation removal</code> leads at 51.44%
+intended - while <code>prescribed burn</code> alone returns 11.59% on
+154,865 pixels (rank 11 of 13) and the largest treatment by area,
+<code>vegetation removal</code> (218,327 pixels), returns 22.89%.
+Mechanical removal paired with seeding is 2.2 times the intended rate of
+removal alone and 4.4 times the rate of burning.</li>
+<li>CLAUDE: The decay through time is the one finding that generalises
+across all five objectives, though what the unintended rate does
+alongside it differs: here the intended rate falls from 34.73% in years
+1-5 to 11.89% at 16+ while the unintended rate rises from 2.82% to
+6.88%, so the intended-to-unintended ratio collapses from 12:1 to 1.7:1.
+Detectable tree-cover reduction is a property of the first decade after
+treatment.</li>
+<li>CLAUDE: The peak means are late (-26.6 at year 29 intended, 14.2 at
+year 31 unintended) but rest on 100 and 27 significant pixels against
+556,499 in total, and no year was truncated here, so the tail of the
+record is retained at very small per-year samples. Treat the peak years
+as poorly determined and lean on the year-bin table for timing
+instead.</li>
 </ul>
 </div>
 <div id="cover-pfg-objective-increase-pfg-1" class="section level4">
@@ -10563,6 +10823,35 @@ environmental context, or an expert eye.</li>
 20 YST) but then become negative after that, indicating a potential
 regression of treatment effects</li>
 <li>Treatment looked generally successful</li>
+<li>CLAUDE: The largest base in the report (605,946 pixels, 539
+polygons) and the second-strongest margin: 20.7% intended against 3.8%
+unintended, 5.4:1.</li>
+<li>CLAUDE: The regression noted above is visible in the year bins, but
+as two separate movements rather than a sign flip: the intended rate
+falls from 27.84% in years 1-5 to 10.94% at 16+ while the unintended
+rate <em>rises</em> from 3.52% to 6.01%, so the ratio collapses from
+7.9:1 to 1.8:1. The magnitude side agrees - the unintended peak mean
+sits at year 21 (-10.6, n = 733 significant pixels). Stating it as decay
+plus a real accumulation of opposite-sign pixels is better supported
+than stating it as an average that turns negative.</li>
+<li>CLAUDE: The intended peak of 23.4 at year 33 is flagged censored and
+rests on 17 significant pixels - the only censored peak in the document.
+It cannot be read as a late resurgence; it marks the end of the
+analysable series for that direction.</li>
+<li>CLAUDE: The treatment ordering repeats <code>decrease_tre</code>’s,
+which is the cross-objective pattern worth reporting:
+<code>seeding;vegetation removal</code> leads at 39.94% intended, the
+largest treatment by area (<code>seeding;soil disturbance</code>,
+165,121 pixels) returns 28.53%, and <code>prescribed burn</code> sits at
+9.70% on 155,032 pixels (rank 10 of 12). Adding mechanical disturbance
+to seeding roughly doubles the intended rate; burning with or before
+seeding does not.</li>
+<li>CLAUDE: On the ecoregion axis, the environmental context asked for
+above should start from the fact that the top cell is small:
+<code>High Elevation Carbonate Mountains</code> at 87.13% intended holds
+1,974 pixels, 0.3% of the objective. The ordering is informative at the
+large end (<code>Semiarid Benchlands and Canyonlands</code>, 229,443
+pixels, 17.59%) and noisy at both extremes.</li>
 </ul>
 </div>
 <div id="cover-shr-objective-increase-shr-1" class="section level4">
@@ -10572,6 +10861,41 @@ regression of treatment effects</li>
 <li>Time effects are negative immediately after treatment, then stay
 generally positive</li>
 <li>Treatment looked generally successful.</li>
+<li>CLAUDE: Call this the weakest of the four objectives that came out
+in the intended direction rather than a straightforward success: 14.9%
+intended against 8.6% unintended is only 1.7:1, so roughly a third of
+the significant pixels moved the wrong way.</li>
+<li>CLAUDE: The knock-down-then-recover reading above is the
+best-supported timing statement in the report, because both sides of it
+rest on large samples: the unintended peak is at year 2 (-11.9, n = 2907
+significant pixels, the largest count behind any peak in the document)
+against an intended peak at year 20 (14.0, n = 378). The year bins agree
+- the unintended rate falls from 11.20% to 6.73% across the record while
+the intended rate falls more slowly, 17.98% to 11.01%.</li>
+<li>CLAUDE: This objective is not an independent sample in any
+meaningful sense - 0.88% of its pixels carry no other objective and
+89.03% also carry <code>increase_pfg</code>. It is best reported as the
+shrub-response arm of the same treatments <code>increase_pfg</code>
+describes. It also shares 16.53% of its pixels with
+<code>decrease_afg</code>, whose unintended positive result is the
+opposite reading of overlapping ground.</li>
+<li>CLAUDE: The treatment ordering does <em>not</em> repeat the pattern
+seen for <code>increase_pfg</code> and <code>decrease_tre</code>, and
+that is worth stating as a difference rather than smoothing over. The
+top rate (<code>soil disturbance</code>, 32.24%) sits on only 2,100
+pixels, and the two largest treatments diverge the wrong way:
+<code>seeding</code> at 82,001 pixels returns 15.35% while
+<code>seeding;soil disturbance</code> at 77,788 pixels returns 12.37%.
+Adding soil disturbance to seeding does not help shrub recovery the way
+it helps perennial grass. <code>prescribed burn</code> is again near the
+bottom (7.38%, rank 11 of 12).</li>
+<li>CLAUDE: The top ecoregion here
+(<code>High Elevation Carbonate Mountains</code>, 76.80% intended on
+1,974 pixels) is the same cell that tops <code>increase_pfg</code>, so
+one small high-elevation area drives the best result for both shrub and
+perennial-grass increase. Confirming it is a real effect rather than a
+sampling artefact needs either the environmental context or more pixels
+from that ecoregion.</li>
 </ul>
 </div>
 </div>

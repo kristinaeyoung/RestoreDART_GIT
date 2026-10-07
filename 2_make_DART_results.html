@@ -367,23 +367,20 @@ the pixel counts, the sparse treatment x ecoregion combinations, what
 each sample-size filter removed, the count histograms, and each
 objective’s own results and interpretation - are in
 <code>2_sample_size_checks.Rmd</code>, which is where the filtering and
-sample-size decisions are made and documented.</li>
-<li>Both documents source <code>0_DART_setup.R</code>. That script reads
-the input file, sets the three sample-size thresholds, applies the
-filters, and builds each objective’s copy of the eight tables compiled
-below, under object names of the form
-<code>&lt;prefix&gt;&lt;objective&gt;_&lt;COVER&gt;</code>.
-<code>collect_obj_tables()</code> gathers them here. Nothing in this
-document computes what it displays, and nothing sets a threshold - a
-threshold lives in exactly one place and takes effect in both documents
-at once.</li>
+sample-size decisions are made and documented. The bulky per-ecoregion
+reference panels are in <code>2_raw_result_graphs.Rmd</code>.</li>
+<li>Nothing in this document computes what it displays, and nothing here
+sets a threshold. <code>0_DART_setup.R</code> does both, for all three
+documents at once, so a threshold change takes effect everywhere and no
+two documents can report different numbers for the same quantity.</li>
 <li>Every compiled table below is therefore built on post-filter data,
 and on <em>unequally</em> filtered data, since the thresholds differ by
 objective. The filtering log is the first thing compiled for that
 reason: read it before comparing objectives to each other.</li>
-<li>Adding an objective means adding its rows to the input data.
-<code>0_DART_setup.R</code> loops over whatever <code>summaries</code>
-contains, so no chunk in this document changes.</li>
+<li>The document runs in this order: terminology, the cross-objective
+direction checks, the compiled tables and figures, and last the
+hand-written interpretation - placed at the end so that it can refer
+back to evidence the reader has already passed.</li>
 </ul>
 </div>
 <div id="terminology-raw-sign-versus-management-intent" class="section level2">
@@ -1577,12 +1574,78 @@ dataset.</caption>
 <div id="summary-table" class="section level4">
 <h4>Summary table</h4>
 <p>One row per objective x cover response x treatment x ecoregion,
-stacked across every objective in the report. The “# / % of time this
-was the objective” columns are shares of the polygon total across every
-element of <code>summaries</code>; the “# / % of time this was the
-treatment” columns are shares of that objective’s own polygon count, so
-a polygon treated more than one way is counted under more than one
-treatment and those percentages are not expected to sum to 100.</p>
+stacked across every objective in the report. <strong>This table is the
+working draft of the reporting deliverable, and the bulleted definitions
+below are what define its columns.</strong></p>
+<p>Every row is built from that objective’s <strong>post-filter</strong>
+data, and the thresholds differ by objective, so rows from different
+objectives describe unequally filtered samples - read the filtering log
+above before comparing them. Column by column, with the denominator
+named wherever there is more than one it could be:</p>
+<ul>
+<li><strong><code>n_time_objective</code></strong> (<em># Times This Was
+Objective</em>) - the number of polygons belonging to this objective,
+counted on the <strong>unfiltered</strong> split, so it is a scope
+figure rather than a post-filter one. Constant across every row of an
+objective.</li>
+<li><strong><code>pct_time_objective</code></strong> (<em>% of Time This
+Was Objective</em>) - the same count over the polygon total summed
+across all five elements of <code>summaries</code>. A polygon is counted
+once per element it appears in, so the denominator counts
+objective-polygon pairs, not distinct polygons; the column does sum to
+100 across the five objectives.</li>
+<li><strong><code>objective</code></strong>,
+<strong><code>cover</code></strong> (<em>Cover Response</em>),
+<strong><code>tx_coarse</code></strong> (<em>Treatment Method</em>),
+<strong><code>us_l4name</code></strong> (<em>Ecoregion</em>) - the four
+grouping keys, one row per combination. <code>cover</code> is the
+differenced RAP cover response (the <code>fun_group</code> column,
+renamed); <code>tx_coarse</code> is the coarse treatment string, so a
+polygon treated several ways carries a compound value such as
+<code>seeding;vegetation removal</code> rather than appearing once per
+component.</li>
+<li><strong><code>n_time_treatment</code></strong> (<em># Times This Was
+Treatment</em>) - distinct polygons within this objective’s post-filter
+data that received this treatment, pooled over ecoregions. Constant
+across the ecoregion rows of one objective x treatment pair.</li>
+<li><strong><code>pct_time_treatment</code></strong> (<em>% of Time This
+Was Treatment</em>) - <code>n_time_treatment</code> over
+<code>n_time_objective</code>. This is a post-filter numerator over an
+unfiltered denominator, and a polygon treated more than one way is
+counted under each of its treatments, so the column is not expected to
+sum to 100 within an objective.</li>
+<li><strong><code>grp_n_pix</code></strong> (<em>Total Pixels</em>) -
+pixels in this cell after all three sample-size filters. This is the
+denominator behind the per-pixel rates quoted elsewhere in the
+report.</li>
+<li><strong><code>grp_n_poly</code></strong> (<em>Number Polygons</em>)
+- distinct polygons contributing those pixels.</li>
+<li><strong><code>grp_n_sig</code></strong> (<em># Significant
+Pixels</em>) - pixels whose DART confidence interval excludes zero, in
+either direction.</li>
+<li><strong><code>grp_n_sig_int</code></strong> /
+<strong><code>grp_n_sig_uni</code></strong> (<em># Significant Pixels
+(Intended)</em> / <em>(Unintended)</em>) - that count split by whether
+the raw sign matched this objective’s goal, via
+<code>get_intended_sign()</code>. They sum to
+<code>grp_n_sig</code>.</li>
+<li><strong><code>grp_perc_int</code></strong> /
+<strong><code>grp_perc_uni</code></strong> (<em>% Significant Pixels
+(Intended)</em> / <em>(Unintended)</em>) - <strong>percentages of
+<code>grp_n_sig</code>, not of <code>grp_n_pix</code>.</strong> They sum
+to 100 up to rounding. This is the one column pair whose rendered label
+can mislead: it is the composition of the significant pixels, not the
+share of the cell that was significant. Two consequences worth knowing.
+A cell with no significant pixels divides zero by zero, giving an
+undefined percentage; those cells render <strong>blank</strong>, and
+<code># Significant Pixels</code> reads 0 alongside them. There are two
+such rows in the current draft, both <code>decrease_tre</code> cells, of
+75 and 50 pixels. And the share-of-all-pixels version
+(<code>grp_perc_sig</code>, significant over total) is computed inside
+<code>reduce_s0()</code> but deliberately not carried into this table,
+so a reader who wants “how much of this cell responded” has to divide
+<code>grp_n_sig</code> by <code>grp_n_pix</code> themselves.</li>
+</ul>
 <table>
 <colgroup>
 <col width="6%" />
@@ -2894,8 +2957,8 @@ removal</td>
 <td align="right">0</td>
 <td align="right">0</td>
 <td align="right">0</td>
-<td align="right">NaN</td>
-<td align="right">NaN</td>
+<td align="right"></td>
+<td align="right"></td>
 </tr>
 <tr class="even">
 <td align="right">453</td>
@@ -3561,8 +3624,8 @@ removal</td>
 <td align="right">0</td>
 <td align="right">0</td>
 <td align="right">0</td>
-<td align="right">NaN</td>
-<td align="right">NaN</td>
+<td align="right"></td>
+<td align="right"></td>
 </tr>
 <tr class="odd">
 <td align="right">453</td>
@@ -6461,28 +6524,6 @@ removal</td>
 </tr>
 </tbody>
 </table>
-<p>The same table is also written out a second time with its columns
-renamed and reordered to match
-<code>table_restoredart_template.xlsx</code>, the reporting spreadsheet
-requested by email, as
-<code>2_DART_results_summary_table_template.csv</code>. The mapping is
-<code>summary_template_map()</code> in <code>helper_functions.R</code>:
-names are the template’s headers copied verbatim from row 1 of the
-spreadsheet - including its “desired”/“undesired” wording, which is that
-spreadsheet’s vocabulary for what this report calls intended/unintended
-- and values are the compiled table’s own column names. It is a first
-pass meant to be corrected by hand, and two entries are guesses rather
-than readings: the template’s first header is “% or # of time this was
-the objective” and the compiled table has both forms, so the percentage
-is used; and column H of the template has no header at all, so it is
-mapped to the overall significant-pixel count on the strength of its
-position between “Number polygons” and “# of pixels Significant &amp;
-desired”. Compiled columns the template does not ask for
-(<code>n_time_objective</code>, <code>n_time_treatment</code>,
-<code>pct_time_treatment</code>) are appended after the mapped ones
-under their own names rather than dropped, so it stays visible which
-columns the template asked for. Nothing writes the <code>.xlsx</code>
-itself - that would need a package this report does not depend on.</p>
 </div>
 <div id="tables-written-to-.csv" class="section level4">
 <h4>Tables written to .csv</h4>
@@ -6559,12 +6600,6 @@ file.</caption>
 <td align="right">284</td>
 <td align="right">15</td>
 </tr>
-<tr class="even">
-<td align="left">summary_table_template</td>
-<td align="left">2_DART_results_summary_table_template.csv</td>
-<td align="right">284</td>
-<td align="right">15</td>
-</tr>
 </tbody>
 </table>
 <hr />
@@ -6592,11 +6627,78 @@ or renamed.</p>
 <div id="across-all-objectives" class="section level4">
 <h4>Across all objectives</h4>
 <p>To be written.</p>
+<ul>
+<li>CLAUDE: Ranked by the share of pixels that moved significantly in
+the intended direction, the objectives run <strong>decrease_tre</strong>
+25.6%, <strong>increase_pfg</strong> 20.7%,
+<strong>increase_shr</strong> 14.9%, <strong>decrease_shr</strong>
+10.3%, <strong>decrease_afg</strong> 5.4%. That is better than a
+fourfold spread across objectives measured the same way on the same
+imagery, so “did treatment work” has no single answer here - it is a
+question about which objective was being pursued, and the answer should
+always be given per objective.</li>
+<li>CLAUDE: decrease_afg is the only objective whose unintended rate
+exceeds its intended one (22.7% against 5.4%). It is also among the
+least independent samples in the report - see the overlap caveat below -
+so the most defensible reading is that treatments aimed at reducing
+annual grass were usually doing something else as well, rather than that
+annual-grass reduction actively backfires.</li>
+<li>CLAUDE: Within each objective the treatment ordering points the same
+way, and it is the most actionable pattern in the report. Every
+objective’s top treatment is seeding, mechanical vegetation removal or
+soil disturbance, alone or combined (decrease_afg: vegetation removal,
+14.1%; decrease_shr: seeding, 24.1%; decrease_tre: seeding;vegetation
+removal, 51.4%; increase_pfg: seeding;vegetation removal, 39.9%;
+increase_shr: soil disturbance, 32.2%), while
+<code>prescribed burn</code> on its own ranks 10 of 11 (8.7%) for
+decrease_shr, 11 of 13 (11.6%) for decrease_tre, 10 of 12 (9.7%) for
+increase_pfg, 11 of 12 (7.4%) for increase_shr. Each ranking is computed
+inside one objective, so the unequal thresholds do not affect it.</li>
+<li>CLAUDE: The corollary is worth stating for the report’s audience:
+the evidence here supports <em>how</em> a treatment was carried out
+mattering more than <em>which</em> cover type it targeted. The
+best-performing objective at 25.6% intended and the worst at 5.4% both
+contain treatments spanning most of the observed range.</li>
+</ul>
 </div>
 <div id="time-since-treatment" class="section level4">
 <h4>Time since treatment</h4>
 <p>To be written. The per-year and binned significance results, the
 mean-effect peaks, and the censoring flags all speak to this.</p>
+<ul>
+<li>CLAUDE: Detectable treatment effects are a property of the first
+decade after treatment, and this is the clearest finding in the report.
+The overall significance rate falls in every successive year bin in 5 of
+5 objectives and the intended rate does the same in 5 of 5; by the 16+
+bin the overall rate is down to 38-61% of its years 1-5 value. Any
+percentage quoted without a year window is an average over a changing
+regime.</li>
+<li>CLAUDE: What the <em>unintended</em> rate does over that span
+differs by objective, and this is where the interpretation has to be
+careful rather than uniform. It ends higher than it started for
+decrease_tre and increase_pfg, so for those the intended-to-unintended
+ratio collapses (decrease_tre 12.3:1 to 1.7:1; increase_pfg 7.9:1 to
+1.8:1) - the intended signal decays <em>and</em> opposite-sign pixels
+accumulate. For the rest the unintended rate decays too, so the balance
+between them is roughly preserved or, for <code>decrease_afg</code>,
+becomes less unfavourable. Stating the pattern as “effects regress over
+time” is right for the first group and wrong for the second.</li>
+<li>CLAUDE: Peak-magnitude timing is the weakest evidence in the
+document and should not be asked to carry an argument. 4 of the 10 rows
+in the peak table rest on fewer than 50 significant pixels, 1 is
+censored at the last observed year, and because the peak is computed
+over significant pixels only, a late year with a handful of surviving
+significant pixels can outrank a well-populated early one. The year-bin
+table above and the per-polygon peak-significance years in
+<code>2_sample_size_checks.Rmd</code> - where every treatment’s mean
+peak falls inside the first decade - are the better basis for a timing
+claim.</li>
+<li>CLAUDE: On the censoring note carried over below: only 1 of the
+compiled peaks is actually flagged (increase_pfg_PFG, positive, year
+33), so censoring is not what limits the timing story at present - the
+thin-pixel problem is, and it is not flagged anywhere in the
+tables.</li>
+</ul>
 <p>Carried over from the single-objective version of this report, where
 it sat with the per-polygon peak/trough tables: a polygon’s peak (or
 trough) year is flagged as censored when it falls on the last year that
@@ -6614,6 +6716,22 @@ objective, so multi-objective treatments appear in several groupings and
 parts of the dataset are counted more than once), and an
 objective/response pairing is only included when the response cover type
 matches the objective’s target cover.</p>
+<ul>
+<li>CLAUDE: The not-a-partition caveat is quantitatively severe, not a
+formality. Only 1 of the 5 objectives keeps more than a fifth of its
+pixels to itself (decrease_tre, 38.1%), and the least independent is
+increase_shr at 0.9%. Per-objective results are therefore repeated
+readings of overlapping ground under different goals, and they cannot be
+added up or treated as independent replicates of “restoration
+treatment”.</li>
+<li>CLAUDE: The one comparison to avoid outright is reading
+<code>decrease_tre</code>’s covariate breakdowns against the other four
+at face value: its per-cell floor is 10 pixels against 300 for the
+others, so it retains treatment x ecoregion cells the other sections
+dropped. Combined filter cost still ranges only 0.00-2.53% of pixels, so
+the thresholds change which <em>levels</em> are present far more than
+how much data is in play.</li>
+</ul>
 </div>
 </div>
 </div>

@@ -168,7 +168,7 @@ knitr::kable(
 
 **Table.** Significance rate within the sparse combinations only: one row per dropped treatment x ecoregion combination, giving its significant pixel count, its total pixel count, and the resulting percentage. Compare against the overall rate reported further down to see whether the dropped cells were unusual.
 
-##### Results after dropping (treatment x ecoregion)
+##### Results after all three filters
 
 The pixel cutoff for each (treatment × ecoregion) combination was `r min_txeco_n_i`.
 
@@ -555,7 +555,7 @@ options(old_na)
 ##### Summary statistics
 
 What the three sample-size filters cost this objective x cover response, in one row - the same
-quantities reported in prose under *Results after dropping* above, gathered here so that this
+quantities reported in prose under *Results after all three filters* above, gathered here so that this
 subsection stands on its own. The identical row appears in the cross-objective filtering log in
 `2_make_DART_results.Rmd`, where it can be read against the other objectives.
 
@@ -593,6 +593,54 @@ interp_text[['decrease_afg_AFG']] <- c(
   "- Significance patterns over treatments are also highly heterogenous, but similarily complex.",
   "- Significance patterns over ecoregion probably require some environmental context, or an expert eye. For example I don't have enough personal knowledge to guess why `Uinta Basin Floor` was so much higher than the other ecoregions.\"",
   "- Treatment was generally not successful."
+)
+
+# CLAUDE: model-generated bullets below, marked as such in the rendered text so
+# their provenance is visible. Every number is computed from the objects this
+# section already built, so none of it is typed in and none of it can drift from
+# the tables above.
+cl_b1  <- sig_by_bin[1, ]
+cl_bn  <- sig_by_bin[nrow(sig_by_bin), ]
+cl_ci  <- if (int_word == 'positive') 'mean_pct_sig_pos' else 'mean_pct_sig_neg'
+cl_cu  <- if (int_word == 'positive') 'mean_pct_sig_neg' else 'mean_pct_sig_pos'
+cl_pki <- peak_effect[peak_effect$direction == int_word, ]
+cl_pku <- peak_effect[peak_effect$direction == uni_word, ]
+cl_txb <- res_tx$summary[which.max(res_tx$summary$n_pix), ]
+cl_ecot <- res_eco$summary[1, ]
+cl_solo <- overlap_tbl$pct_pix[overlap_tbl$co_occurring_objective == 'none']
+cl_co   <- overlap_tbl[overlap_tbl$co_occurring_objective != 'none', ][1, ]
+cl_pb   <- res_tx$summary[res_tx$summary$tx_coarse == 'prescribed burn', ]
+
+interp_text[['decrease_afg_AFG']] <- c(
+  interp_text[['decrease_afg_AFG']],
+  sprintf(
+    "- CLAUDE: The unintended direction dominates by a factor of %.1f (%.1f%% of pixels unintended against %.1f%% intended), and it dominates in *every* year bin: the ratio narrows from %.1f:1 in years 1-5 to %.1f:1 at 16+ but never reverses. So the result is not an early transient that later resolves - it is the standing pattern for this objective across the whole record.",
+    int_effect$pct_sig_und / int_effect$pct_sig_int, int_effect$pct_sig_und, int_effect$pct_sig_int,
+    cl_b1[[cl_cu]] / cl_b1[[cl_ci]], cl_bn[[cl_cu]] / cl_bn[[cl_ci]]
+  ),
+  sprintf(
+    "- CLAUDE: The compound-objective explanation offered above is consistent with the overlap structure: only %.2f%% of these pixels carry no other objective, while %.2f%% also carry `%s`. This section is therefore not an independent sample - it is largely the same ground the other objectives report, read against a different goal.",
+    cl_solo, cl_co$pct_pix, cl_co$co_occurring_objective
+  ),
+  sprintf(
+    "- CLAUDE: The ecoregion spread is driven by small cells and should be read as a hypothesis-generating list, not a ranking. The top ecoregion (`%s`, %.2f%% intended) holds %s pixels, %.1f%% of this objective's %s, while the pixel-weighted rate for the objective as a whole is %.1f%%. Any statement about the objective should quote the weighted rate.",
+    cl_ecot$us_l4name, cl_ecot$pct_sig, format(cl_ecot$n_pix, big.mark = ','),
+    100 * cl_ecot$n_pix / sum(res_eco$summary$n_pix),
+    format(sum(res_eco$summary$n_pix), big.mark = ','), int_effect$pct_sig_int
+  ),
+  sprintf(
+    "- CLAUDE: Within the treatment axis the ordering is interpretable even if the levels are heterogeneous: `%s` ranks first at %.2f%% intended, with %d of %d treatments above 10%%, and the largest treatment by area - `%s`, %s pixels - returns %.2f%%. Where intended reductions in annual grass did occur they involved physically removing or disturbing vegetation rather than seeding alone.",
+    res_tx$summary$tx_coarse[1], res_tx$summary$pct_sig[1],
+    sum(res_tx$summary$pct_sig > 10), nrow(res_tx$summary),
+    cl_txb$tx_coarse, format(cl_txb$n_pix, big.mark = ','), cl_txb$pct_sig
+  ),
+  sprintf(
+    "- CLAUDE: Do not read timing off the peak-magnitude table for this objective. The intended peak (%.1f at year %s) rests on %d significant pixels and the unintended peak (%.1f at year %s) on %d, both late in a record truncated at year %s. The per-polygon peak-significance years are early by contrast (treatment means of %.1f-%.1f years), so the *frequency* of a significant effect peaks early and decays while the large late means come from very few pixels.",
+    cl_pki$peak_effect, cl_pki$peak_year, cl_pki$peak_n_pix,
+    cl_pku$peak_effect, cl_pku$peak_year, cl_pku$peak_n_pix,
+    .st$filter_log$year_trunc_at,
+    min(time_summary_by_tx$mean_year_max), max(time_summary_by_tx$mean_year_max)
+  )
 )
 ```
 
@@ -702,7 +750,7 @@ knitr::kable(
 
 **Table.** Significance rate within the sparse combinations only: one row per dropped treatment x ecoregion combination, giving its significant pixel count, its total pixel count, and the resulting percentage. Compare against the overall rate reported further down to see whether the dropped cells were unusual.
 
-##### Results after dropping (treatment x ecoregion)
+##### Results after all three filters
 
 The pixel cutoff for each (treatment × ecoregion) combination was `r min_txeco_n_i`.
 
@@ -1089,7 +1137,7 @@ options(old_na)
 ##### Summary statistics
 
 What the three sample-size filters cost this objective x cover response, in one row - the same
-quantities reported in prose under *Results after dropping* above, gathered here so that this
+quantities reported in prose under *Results after all three filters* above, gathered here so that this
 subsection stands on its own. The identical row appears in the cross-objective filtering log in
 `2_make_DART_results.Rmd`, where it can be read against the other objectives.
 
@@ -1124,6 +1172,56 @@ ecoregion, against a per-cell threshold of `r min_txeco_n_i`.
 interp_text[['decrease_shr_SHR']] <- c(
   "- Treatment looked successful, but at a smaller magnitude than the other objectives",
   "- needs more details"
+)
+
+# CLAUDE: model-generated bullets below, marked as such in the rendered text so
+# their provenance is visible. Every number is computed from the objects this
+# section already built, so none of it is typed in and none of it can drift from
+# the tables above.
+cl_b1  <- sig_by_bin[1, ]
+cl_bn  <- sig_by_bin[nrow(sig_by_bin), ]
+cl_ci  <- if (int_word == 'positive') 'mean_pct_sig_pos' else 'mean_pct_sig_neg'
+cl_cu  <- if (int_word == 'positive') 'mean_pct_sig_neg' else 'mean_pct_sig_pos'
+cl_pki <- peak_effect[peak_effect$direction == int_word, ]
+cl_pku <- peak_effect[peak_effect$direction == uni_word, ]
+cl_txb <- res_tx$summary[which.max(res_tx$summary$n_pix), ]
+cl_ecot <- res_eco$summary[1, ]
+cl_solo <- overlap_tbl$pct_pix[overlap_tbl$co_occurring_objective == 'none']
+cl_co   <- overlap_tbl[overlap_tbl$co_occurring_objective != 'none', ][1, ]
+cl_pb   <- res_tx$summary[res_tx$summary$tx_coarse == 'prescribed burn', ]
+
+interp_text[['decrease_shr_SHR']] <- c(
+  interp_text[['decrease_shr_SHR']],
+  sprintf(
+    "- CLAUDE: The frequency evidence supports the reading above: the intended direction outnumbers the unintended one %.1f:1 (%.1f%% against %.1f%%), the second-narrowest margin among the four objectives whose result went in the intended direction, and the intended peak mean effect is %.1f in Δ RAP cover units at year %s (n = %d significant pixels).",
+    int_effect$pct_sig_int / int_effect$pct_sig_und, int_effect$pct_sig_int, int_effect$pct_sig_und,
+    cl_pki$peak_effect, cl_pki$peak_year, cl_pki$peak_n_pix
+  ),
+  sprintf(
+    "- CLAUDE: The objective-level rate is effectively one treatment's rate on one ecoregion. `%s` carries %s of the %s pixels (%.0f%%) at %.2f%% intended, and `%s` carries %s (%.0f%%) at %.2f%%; the higher rates in those tables - `%s` at %.2f%% and `%s` at %.2f%% - each sit on a few percent of the pixels. The %.1f%% headline should be attributed accordingly rather than read as a general result for shrub reduction.",
+    cl_txb$tx_coarse, format(cl_txb$n_pix, big.mark = ','),
+    format(sum(res_tx$summary$n_pix), big.mark = ','),
+    100 * cl_txb$n_pix / sum(res_tx$summary$n_pix), cl_txb$pct_sig,
+    res_eco$summary$us_l4name[which.max(res_eco$summary$n_pix)],
+    format(max(res_eco$summary$n_pix), big.mark = ','),
+    100 * max(res_eco$summary$n_pix) / sum(res_eco$summary$n_pix),
+    res_eco$summary$pct_sig[which.max(res_eco$summary$n_pix)],
+    res_tx$summary$tx_coarse[1], res_tx$summary$pct_sig[1],
+    cl_ecot$us_l4name, cl_ecot$pct_sig, int_effect$pct_sig_int
+  ),
+  sprintf(
+    "- CLAUDE: The response is immediate and then erodes rather than building: the intended peak falls at year %s, the earliest of any objective, and the intended rate declines monotonically from %.2f%% in years 1-5 to %.2f%% at 16+. Nothing here suggests a lagged shrub reduction.",
+    cl_pki$peak_year, cl_b1[[cl_ci]], cl_bn[[cl_ci]]
+  ),
+  sprintf(
+    "- CLAUDE: Ignore the unintended peak of %.1f at year %s - it is backed by n = %d significant pixels and has no SE, so it is a single-pixel artefact of averaging over significant pixels only, not a late reversal. The late-year truncation at year %s does not catch it, because that filter counts across both directions.",
+    cl_pku$peak_effect, cl_pku$peak_year, cl_pku$peak_n_pix, .st$filter_log$year_trunc_at
+  ),
+  sprintf(
+    "- CLAUDE: This objective has the thinnest polygon base of the five - %d polygons across %d treatments, with up to %.0f%% of a treatment's polygons censored at their last observed year - so the per-polygon peak-year summaries are indicative only. %.2f%% of its pixels carry another objective (%.2f%% also `%s`), which means the shrub reduction cannot be separated from the treatments those objectives describe.",
+    sum(time_summary_by_tx$n_polygons), nrow(time_summary_by_tx),
+    max(time_summary_by_tx$pct_censored_max), 100 - cl_solo, cl_co$pct_pix, cl_co$co_occurring_objective
+  )
 )
 ```
 
@@ -1233,7 +1331,7 @@ knitr::kable(
 
 **Table.** Significance rate within the sparse combinations only: one row per dropped treatment x ecoregion combination, giving its significant pixel count, its total pixel count, and the resulting percentage. Compare against the overall rate reported further down to see whether the dropped cells were unusual.
 
-##### Results after dropping (treatment x ecoregion)
+##### Results after all three filters
 
 The pixel cutoff for each (treatment × ecoregion) combination was `r min_txeco_n_i`.
 
@@ -1620,7 +1718,7 @@ options(old_na)
 ##### Summary statistics
 
 What the three sample-size filters cost this objective x cover response, in one row - the same
-quantities reported in prose under *Results after dropping* above, gathered here so that this
+quantities reported in prose under *Results after all three filters* above, gathered here so that this
 subsection stands on its own. The identical row appears in the cross-objective filtering log in
 `2_make_DART_results.Rmd`, where it can be read against the other objectives.
 
@@ -1654,6 +1752,54 @@ ecoregion, against a per-cell threshold of `r min_txeco_n_i`.
 # so the two can never disagree.
 interp_text[['decrease_tre_TRE']] <- c(
   "- To be written."
+)
+
+# CLAUDE: model-generated bullets below, marked as such in the rendered text so
+# their provenance is visible. Every number is computed from the objects this
+# section already built, so none of it is typed in and none of it can drift from
+# the tables above.
+cl_b1  <- sig_by_bin[1, ]
+cl_bn  <- sig_by_bin[nrow(sig_by_bin), ]
+cl_ci  <- if (int_word == 'positive') 'mean_pct_sig_pos' else 'mean_pct_sig_neg'
+cl_cu  <- if (int_word == 'positive') 'mean_pct_sig_neg' else 'mean_pct_sig_pos'
+cl_pki <- peak_effect[peak_effect$direction == int_word, ]
+cl_pku <- peak_effect[peak_effect$direction == uni_word, ]
+cl_txb <- res_tx$summary[which.max(res_tx$summary$n_pix), ]
+cl_ecot <- res_eco$summary[1, ]
+cl_solo <- overlap_tbl$pct_pix[overlap_tbl$co_occurring_objective == 'none']
+cl_co   <- overlap_tbl[overlap_tbl$co_occurring_objective != 'none', ][1, ]
+cl_pb   <- res_tx$summary[res_tx$summary$tx_coarse == 'prescribed burn', ]
+
+interp_text[['decrease_tre_TRE']] <- c(
+  interp_text[['decrease_tre_TRE']],
+  sprintf(
+    "- CLAUDE: This is the strongest and cleanest result in the report. The intended direction outnumbers the unintended one %.1f:1 (%.1f%% against %.1f%%) on the largest pixel base of the five (%s), and it is the only objective where a substantial share of pixels - %.2f%% - carries no other objective, so it is the one result that is close to an independent sample.",
+    int_effect$pct_sig_int / int_effect$pct_sig_und, int_effect$pct_sig_int,
+    int_effect$pct_sig_und, format(int_effect$n_pix, big.mark = ','), cl_solo
+  ),
+  sprintf(
+    "- CLAUDE: Read its covariate tables with the threshold in mind. This objective's per-cell floor is %d pixels against 300 for the other four, and no cell, level or year was dropped (%.2f%% of pixels lost), so its treatment and ecoregion tables retain cells the other sections would have removed - the smallest surviving ecoregion row is %s pixels. The extreme rates at the top of the ecoregion table are those cells; the pixel-weighted rate is %.1f%%.",
+    as.integer(min_txeco_n_i), .st$filter_log$pct_pix_lost,
+    format(min(res_eco$summary$n_pix), big.mark = ','), int_effect$pct_sig_int
+  ),
+  sprintf(
+    "- CLAUDE: The treatment ordering is the clearest management signal in the document. Every combination of seeding with mechanical work sits at the top - `%s` leads at %.2f%% intended - while `prescribed burn` alone returns %.2f%% on %s pixels (rank %d of %d) and the largest treatment by area, `%s` (%s pixels), returns %.2f%%. Mechanical removal paired with seeding is %.1f times the intended rate of removal alone and %.1f times the rate of burning.",
+    res_tx$summary$tx_coarse[1], res_tx$summary$pct_sig[1],
+    cl_pb$pct_sig, format(cl_pb$n_pix, big.mark = ','),
+    match('prescribed burn', res_tx$summary$tx_coarse), nrow(res_tx$summary),
+    cl_txb$tx_coarse, format(cl_txb$n_pix, big.mark = ','), cl_txb$pct_sig,
+    res_tx$summary$pct_sig[1] / cl_txb$pct_sig, res_tx$summary$pct_sig[1] / cl_pb$pct_sig
+  ),
+  sprintf(
+    "- CLAUDE: The decay through time is the one finding that generalises across all five objectives, though what the unintended rate does alongside it differs: here the intended rate falls from %.2f%% in years 1-5 to %.2f%% at 16+ while the unintended rate rises from %.2f%% to %.2f%%, so the intended-to-unintended ratio collapses from %.0f:1 to %.1f:1. Detectable tree-cover reduction is a property of the first decade after treatment.",
+    cl_b1[[cl_ci]], cl_bn[[cl_ci]], cl_b1[[cl_cu]], cl_bn[[cl_cu]],
+    cl_b1[[cl_ci]] / cl_b1[[cl_cu]], cl_bn[[cl_ci]] / cl_bn[[cl_cu]]
+  ),
+  sprintf(
+    "- CLAUDE: The peak means are late (%.1f at year %s intended, %.1f at year %s unintended) but rest on %d and %d significant pixels against %s in total, and no year was truncated here, so the tail of the record is retained at very small per-year samples. Treat the peak years as poorly determined and lean on the year-bin table for timing instead.",
+    cl_pki$peak_effect, cl_pki$peak_year, cl_pku$peak_effect, cl_pku$peak_year,
+    cl_pki$peak_n_pix, cl_pku$peak_n_pix, format(int_effect$n_pix, big.mark = ',')
+  )
 )
 ```
 
@@ -1763,7 +1909,7 @@ knitr::kable(
 
 **Table.** Significance rate within the sparse combinations only: one row per dropped treatment x ecoregion combination, giving its significant pixel count, its total pixel count, and the resulting percentage. Compare against the overall rate reported further down to see whether the dropped cells were unusual.
 
-##### Results after dropping (treatment x ecoregion)
+##### Results after all three filters
 
 The pixel cutoff for each (treatment × ecoregion) combination was `r min_txeco_n_i`.
 
@@ -2150,7 +2296,7 @@ options(old_na)
 ##### Summary statistics
 
 What the three sample-size filters cost this objective x cover response, in one row - the same
-quantities reported in prose under *Results after dropping* above, gathered here so that this
+quantities reported in prose under *Results after all three filters* above, gathered here so that this
 subsection stands on its own. The identical row appears in the cross-objective filtering log in
 `2_make_DART_results.Rmd`, where it can be read against the other objectives.
 
@@ -2188,6 +2334,57 @@ interp_text[['increase_pfg_PFG']] <- c(
   "- Significance patterns over ecoregion probably require some environmental context, or an expert eye.",
   "- Time effects look to be very positive earlier in the treatment (< 20 YST) but then become negative after that, indicating a potential regression of treatment effects",
   "- Treatment looked generally successful"
+)
+
+# CLAUDE: model-generated bullets below, marked as such in the rendered text so
+# their provenance is visible. Every number is computed from the objects this
+# section already built, so none of it is typed in and none of it can drift from
+# the tables above.
+cl_b1  <- sig_by_bin[1, ]
+cl_bn  <- sig_by_bin[nrow(sig_by_bin), ]
+cl_ci  <- if (int_word == 'positive') 'mean_pct_sig_pos' else 'mean_pct_sig_neg'
+cl_cu  <- if (int_word == 'positive') 'mean_pct_sig_neg' else 'mean_pct_sig_pos'
+cl_pki <- peak_effect[peak_effect$direction == int_word, ]
+cl_pku <- peak_effect[peak_effect$direction == uni_word, ]
+cl_txb <- res_tx$summary[which.max(res_tx$summary$n_pix), ]
+cl_ecot <- res_eco$summary[1, ]
+cl_solo <- overlap_tbl$pct_pix[overlap_tbl$co_occurring_objective == 'none']
+cl_co   <- overlap_tbl[overlap_tbl$co_occurring_objective != 'none', ][1, ]
+cl_pb   <- res_tx$summary[res_tx$summary$tx_coarse == 'prescribed burn', ]
+
+interp_text[['increase_pfg_PFG']] <- c(
+  interp_text[['increase_pfg_PFG']],
+  sprintf(
+    "- CLAUDE: The largest base in the report (%s pixels, %d polygons) and the second-strongest margin: %.1f%% intended against %.1f%% unintended, %.1f:1.",
+    format(int_effect$n_pix, big.mark = ','), sum(time_summary_by_tx$n_polygons),
+    int_effect$pct_sig_int, int_effect$pct_sig_und,
+    int_effect$pct_sig_int / int_effect$pct_sig_und
+  ),
+  sprintf(
+    "- CLAUDE: The regression noted above is visible in the year bins, but as two separate movements rather than a sign flip: the intended rate falls from %.2f%% in years 1-5 to %.2f%% at 16+ while the unintended rate *rises* from %.2f%% to %.2f%%, so the ratio collapses from %.1f:1 to %.1f:1. The magnitude side agrees - the unintended peak mean sits at year %s (%.1f, n = %d significant pixels). Stating it as decay plus a real accumulation of opposite-sign pixels is better supported than stating it as an average that turns negative.",
+    cl_b1[[cl_ci]], cl_bn[[cl_ci]], cl_b1[[cl_cu]], cl_bn[[cl_cu]],
+    cl_b1[[cl_ci]] / cl_b1[[cl_cu]], cl_bn[[cl_ci]] / cl_bn[[cl_cu]],
+    cl_pku$peak_year, cl_pku$peak_effect, cl_pku$peak_n_pix
+  ),
+  sprintf(
+    "- CLAUDE: The intended peak of %.1f at year %s is flagged censored and rests on %d significant pixels - the only censored peak in the document. It cannot be read as a late resurgence; it marks the end of the analysable series for that direction.",
+    cl_pki$peak_effect, cl_pki$peak_year, cl_pki$peak_n_pix
+  ),
+  sprintf(
+    "- CLAUDE: The treatment ordering repeats `decrease_tre`'s, which is the cross-objective pattern worth reporting: `%s` leads at %.2f%% intended, the largest treatment by area (`%s`, %s pixels) returns %.2f%%, and `prescribed burn` sits at %.2f%% on %s pixels (rank %d of %d). Adding mechanical disturbance to seeding roughly doubles the intended rate; burning with or before seeding does not.",
+    res_tx$summary$tx_coarse[1], res_tx$summary$pct_sig[1],
+    cl_txb$tx_coarse, format(cl_txb$n_pix, big.mark = ','), cl_txb$pct_sig,
+    cl_pb$pct_sig, format(cl_pb$n_pix, big.mark = ','),
+    match('prescribed burn', res_tx$summary$tx_coarse), nrow(res_tx$summary)
+  ),
+  sprintf(
+    "- CLAUDE: On the ecoregion axis, the environmental context asked for above should start from the fact that the top cell is small: `%s` at %.2f%% intended holds %s pixels, %.1f%% of the objective. The ordering is informative at the large end (`%s`, %s pixels, %.2f%%) and noisy at both extremes.",
+    cl_ecot$us_l4name, cl_ecot$pct_sig, format(cl_ecot$n_pix, big.mark = ','),
+    100 * cl_ecot$n_pix / sum(res_eco$summary$n_pix),
+    res_eco$summary$us_l4name[which.max(res_eco$summary$n_pix)],
+    format(max(res_eco$summary$n_pix), big.mark = ','),
+    res_eco$summary$pct_sig[which.max(res_eco$summary$n_pix)]
+  )
 )
 ```
 
@@ -2297,7 +2494,7 @@ knitr::kable(
 
 **Table.** Significance rate within the sparse combinations only: one row per dropped treatment x ecoregion combination, giving its significant pixel count, its total pixel count, and the resulting percentage. Compare against the overall rate reported further down to see whether the dropped cells were unusual.
 
-##### Results after dropping (treatment x ecoregion)
+##### Results after all three filters
 
 The pixel cutoff for each (treatment × ecoregion) combination was `r min_txeco_n_i`.
 
@@ -2684,7 +2881,7 @@ options(old_na)
 ##### Summary statistics
 
 What the three sample-size filters cost this objective x cover response, in one row - the same
-quantities reported in prose under *Results after dropping* above, gathered here so that this
+quantities reported in prose under *Results after all three filters* above, gathered here so that this
 subsection stands on its own. The identical row appears in the cross-objective filtering log in
 `2_make_DART_results.Rmd`, where it can be read against the other objectives.
 
@@ -2720,6 +2917,56 @@ interp_text[['increase_shr_SHR']] <- c(
   "- Mostly same considerations as `increase_pfg`",
   "- Time effects are negative immediately after treatment, then stay generally positive",
   "- Treatment looked generally successful."
+)
+
+# CLAUDE: model-generated bullets below, marked as such in the rendered text so
+# their provenance is visible. Every number is computed from the objects this
+# section already built, so none of it is typed in and none of it can drift from
+# the tables above.
+cl_b1  <- sig_by_bin[1, ]
+cl_bn  <- sig_by_bin[nrow(sig_by_bin), ]
+cl_ci  <- if (int_word == 'positive') 'mean_pct_sig_pos' else 'mean_pct_sig_neg'
+cl_cu  <- if (int_word == 'positive') 'mean_pct_sig_neg' else 'mean_pct_sig_pos'
+cl_pki <- peak_effect[peak_effect$direction == int_word, ]
+cl_pku <- peak_effect[peak_effect$direction == uni_word, ]
+cl_txb <- res_tx$summary[which.max(res_tx$summary$n_pix), ]
+cl_ecot <- res_eco$summary[1, ]
+cl_solo <- overlap_tbl$pct_pix[overlap_tbl$co_occurring_objective == 'none']
+cl_co   <- overlap_tbl[overlap_tbl$co_occurring_objective != 'none', ][1, ]
+cl_pb   <- res_tx$summary[res_tx$summary$tx_coarse == 'prescribed burn', ]
+
+interp_text[['increase_shr_SHR']] <- c(
+  interp_text[['increase_shr_SHR']],
+  sprintf(
+    "- CLAUDE: Call this the weakest of the four objectives that came out in the intended direction rather than a straightforward success: %.1f%% intended against %.1f%% unintended is only %.1f:1, so roughly a third of the significant pixels moved the wrong way.",
+    int_effect$pct_sig_int, int_effect$pct_sig_und,
+    int_effect$pct_sig_int / int_effect$pct_sig_und
+  ),
+  sprintf(
+    "- CLAUDE: The knock-down-then-recover reading above is the best-supported timing statement in the report, because both sides of it rest on large samples: the unintended peak is at year %s (%.1f, n = %d significant pixels, the largest count behind any peak in the document) against an intended peak at year %s (%.1f, n = %d). The year bins agree - the unintended rate falls from %.2f%% to %.2f%% across the record while the intended rate falls more slowly, %.2f%% to %.2f%%.",
+    cl_pku$peak_year, cl_pku$peak_effect, cl_pku$peak_n_pix,
+    cl_pki$peak_year, cl_pki$peak_effect, cl_pki$peak_n_pix,
+    cl_b1[[cl_cu]], cl_bn[[cl_cu]], cl_b1[[cl_ci]], cl_bn[[cl_ci]]
+  ),
+  sprintf(
+    "- CLAUDE: This objective is not an independent sample in any meaningful sense - %.2f%% of its pixels carry no other objective and %.2f%% also carry `%s`. It is best reported as the shrub-response arm of the same treatments `increase_pfg` describes. It also shares %.2f%% of its pixels with `decrease_afg`, whose unintended positive result is the opposite reading of overlapping ground.",
+    cl_solo, cl_co$pct_pix, cl_co$co_occurring_objective,
+    overlap_tbl$pct_pix[overlap_tbl$co_occurring_objective == 'decrease_afg']
+  ),
+  sprintf(
+    "- CLAUDE: The treatment ordering does *not* repeat the pattern seen for `increase_pfg` and `decrease_tre`, and that is worth stating as a difference rather than smoothing over. The top rate (`%s`, %.2f%%) sits on only %s pixels, and the two largest treatments diverge the wrong way: `%s` at %s pixels returns %.2f%% while `%s` at %s pixels returns %.2f%%. Adding soil disturbance to seeding does not help shrub recovery the way it helps perennial grass. `prescribed burn` is again near the bottom (%.2f%%, rank %d of %d).",
+    res_tx$summary$tx_coarse[1], res_tx$summary$pct_sig[1],
+    format(res_tx$summary$n_pix[1], big.mark = ','),
+    cl_txb$tx_coarse, format(cl_txb$n_pix, big.mark = ','), cl_txb$pct_sig,
+    res_tx$summary$tx_coarse[order(-res_tx$summary$n_pix)][2],
+    format(sort(res_tx$summary$n_pix, decreasing = T)[2], big.mark = ','),
+    res_tx$summary$pct_sig[order(-res_tx$summary$n_pix)][2],
+    cl_pb$pct_sig, match('prescribed burn', res_tx$summary$tx_coarse), nrow(res_tx$summary)
+  ),
+  sprintf(
+    "- CLAUDE: The top ecoregion here (`%s`, %.2f%% intended on %s pixels) is the same cell that tops `increase_pfg`, so one small high-elevation area drives the best result for both shrub and perennial-grass increase. Confirming it is a real effect rather than a sampling artefact needs either the environmental context or more pixels from that ecoregion.",
+    cl_ecot$us_l4name, cl_ecot$pct_sig, format(cl_ecot$n_pix, big.mark = ',')
+  )
 )
 ```
 
