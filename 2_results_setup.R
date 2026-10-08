@@ -7,18 +7,18 @@
 #
 # It exists because the two documents need the same things. The sample-size
 # thresholds must be set in one place or a figure can be filtered differently
-# from its own sample-size check, and the eight per-objective tables that
+# from its own sample-size check, and the nine per-objective tables that
 # `collect_obj_tables()` stacks across objectives are displayed in the main
 # report but described in the checks file - so whichever document displays them,
 # they have to be built somewhere both can reach.
 #
 # Source it from a knitr chunk as:
 #
-#   source('0_DART_setup.R', local = knitr::knit_global())
+#   source('2_results_setup.R', local = knitr::knit_global())
 #
 # The `local =` argument matters: `collect_obj_tables()` looks for objects in
 # `ls(envir = parent.frame())`, which from a chunk is the knit environment, so
-# the eight `<prefix><objective>_<COVER>` objects this script assigns have to
+# the nine `<prefix><objective>_<COVER>` objects this script assigns have to
 # land there rather than in whatever environment `source()` would pick by
 # default.
 #
@@ -31,7 +31,7 @@
 #   obj_state      one list per element, keyed by element name, carrying that
 #                  objective's labels, its filtering bookkeeping and its tables
 #   poly_by_obj, total_poly_all, poly_by_elem, obj_of_elem  polygon inventory
-#   <prefix><objective>_<COVER>   the eight compiled-table copies, flat, for
+#   <prefix><objective>_<COVER>   the nine compiled-table copies, flat, for
 #                  collect_obj_tables()
 
 # dplyr, tidyr and ggplot2 are attached here rather than left to the require()
@@ -53,10 +53,39 @@ source('helper_functions.R', local = environment())
 
 # ---- constants ----------------------------------------------------------
 
-fig_dir <- '../../results/figures'
-out_dir <- '../../results'
-#in_fl   <- '../../RestoreDART_DATA/MIXED_MODELS/1_combined_filter_input_data_06192026.csv'
-in_fl   <- '../../RestoreDART_DATA/claude_visible/1_combined_filter_input_data_06192026.csv'
+# All paths are relative to the repository root, which is where the three
+# `.Rmd` files live and therefore the working directory knitr renders them in.
+# The input file sits outside the repository on purpose - it is 3.2 GB and is
+# the DART stage's output, not source - and the results directory sits beside
+# it so that nothing generated lands under version control.
+#
+# Earlier locations, kept because they are the record of where the inputs have
+# lived rather than because any still resolves:
+#   '../../RestoreDART_DATA/MIXED_MODELS/1_combined_filter_input_data_06192026.csv'
+#   '../../RestoreDART_DATA/claude_visible/1_combined_filter_input_data_06192026.csv'
+#   '../claude_visible/1_combined_filter_input_data_06192026.csv'
+# and '../../results' / '../../results/figures', then
+# '../claude_visible/results' / '.../figures', for the two output directories.
+# The '../claude_visible' round was retired on 07 Oct 2026 when that directory
+# was removed and the stage-1 inputs and output were consolidated under
+# ../analysis_inputs.
+
+# Version stamp of the stage-1 output this report describes, MMDDYYYY. Must be
+# bumped to match `out_stamp` in 1_combine_filter_input_data.R whenever that
+# script is re-run; neither is derived from Sys.Date(), deliberately, so that a
+# stamp cannot move on its own and silently decouple the report from the file it
+# describes. Grep both files for the stamp before changing either.
+in_stamp <- '10072026'
+
+fig_dir <- '../analysis_inputs/results/figures'
+out_dir <- '../analysis_inputs/results'
+in_fl   <- paste0('../analysis_inputs/RestoreDART_DATA/MIXED_MODELS/',
+                  '1_combined_filter_input_data_', in_stamp, '.csv')
+
+# Asserted rather than left to fail at the read: a wrong `in_fl` otherwise
+# surfaces as a read.csv() error several lines down, and a missing `out_dir`
+# not until the write_csv chunk at the very end of a three-minute render.
+stopifnot(file.exists(in_fl), dir.exists(out_dir), dir.exists(fig_dir))
 
 # Sample-size thresholds applied to each treatment x ecoregion combination, in
 # pixels. This is the ONLY place the thresholds are set. `default` applies to
@@ -168,7 +197,7 @@ total_poly_all <- sum(poly_by_elem)
 # ---- derive -------------------------------------------------------------
 
 # One pass per element of `summaries`: resolve that objective's two thresholds,
-# apply the three sample-size filters in order, and build the eight tables that
+# apply the three sample-size filters in order, and build the nine tables that
 # are compiled across objectives.
 #
 # This used to live in the per-objective template, which ran inside the report
@@ -239,7 +268,7 @@ for (.i in seq_along(summaries)) {
   # and the threshold responsible.
   if (nrow(trimmed_input) == 0) {
     stop(sprintf(
-      'min_txeco_n = %s excludes all %d treatment x ecoregion combinations for "%s"; lower the threshold for this objective in 0_DART_setup.R.',
+      'min_txeco_n = %s excludes all %d treatment x ecoregion combinations for "%s"; lower the threshold for this objective in 2_results_setup.R.',
       min_txeco_n_i, nrow(excl_combo), obj_nm
     ))
   }
@@ -285,7 +314,7 @@ for (.i in seq_along(summaries)) {
   dropped_tx  <- setdiff(tx_bef,  unique(s_0f$input$tx_coarse))
   dropped_eco <- setdiff(eco_bef, unique(s_0f$input$us_l4name))
 
-  # --- the eight tables compiled across objectives ---
+  # --- the nine tables compiled across objectives ---
   #
   # Each is assigned below under `<prefix><objective>_<COVER>`, the name
   # collect_obj_tables() matches on. Adding an objective to the input data adds
@@ -344,6 +373,15 @@ for (.i in seq_along(summaries)) {
   # The same total expressed as intended versus unintended rather than as raw
   # sign.
   int_effect <- summarize_intended_effect(s_0f$input, cur_obj, cur_cover)
+
+  # Per-polygon significance: the mean, SD and SE across POLYGONS of each
+  # polygon's own percent-significant, rather than a pixel-level share. Built
+  # here with the other eight rather than in the report document, where it used
+  # to be computed in a loop over `summaries_mod` - the one place a document
+  # derived a quantity it displayed, against this script's whole reason for
+  # existing. Moving it also puts its rows in the same order as every other
+  # compiled table, since they now all come back through collect_obj_tables().
+  poly_sig <- summarize_poly_sig(s_0f$input, cur_obj, cur_cover)
 
   # Mean effect over significant pixels per year, and the peak year per
   # direction. `effect_by_year` is kept alongside the peak table because the
@@ -442,6 +480,7 @@ for (.i in seq_along(summaries)) {
     filter_log       = filter_log,
     txeco_post       = txeco_post,
     sig_overall      = sig_overall,
+    poly_sig         = poly_sig,
     int_effect       = int_effect,
     effect_by_year   = effect_by_year,
     peak_effect      = peak_effect,
@@ -456,6 +495,7 @@ for (.i in seq_along(summaries)) {
   assign(paste0('filter_log_',  obj_nm), filter_log)
   assign(paste0('txeco_post_',  obj_nm), txeco_post)
   assign(paste0('sig_overall_', obj_nm), sig_overall)
+  assign(paste0('poly_sig_',    obj_nm), poly_sig)
   assign(paste0('int_effect_',  obj_nm), int_effect)
   assign(paste0('peak_effect_', obj_nm), peak_effect)
   assign(paste0('sig_by_bin_',  obj_nm), sig_by_bin)
@@ -476,7 +516,7 @@ rm(list = intersect(
     'excl_combo', 'n_pix_lost_combo', 'pct_lost_combo', 'n_excl_combo',
     'tx_bef', 'eco_bef', 's0_summary_bef', 'n_pix_bef', 'trimmed_input',
     'depop', 'year_trunc', 's0_summary_aft', 'n_pix_aft', 'pct_lost_trim',
-    'dropped_tx', 'dropped_eco', 'filter_log', 'txeco_post', 'sig_overall',
+    'dropped_tx', 'dropped_eco', 'filter_log', 'txeco_post', 'sig_overall', 'poly_sig',
     'int_effect', 'effect_by_year', 'peak_effect', 'df_bin', 'sig_by_bin',
     'overlap_tbl', 'n_time_obj', 'pct_time_obj', 'poly_by_tx', 'summary_tbl'),
   ls()

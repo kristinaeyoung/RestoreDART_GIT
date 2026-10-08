@@ -610,12 +610,20 @@ get_summary_DART_results <- function(
     theme(axis.text = element_text(color = 'black'))
 
   # overall DART significance
+  # mean() of the logical rather than table(...)[['TRUE']]. The table form has no
+  # 'TRUE' entry at all when no pixel in `df_in` is significant, so the lookup
+  # died with "subscript out of bounds" several calls below the real cause - the
+  # failure the staged-data check hit. The two `pix_sig_pos <- ` / `pix_sig_neg <- `
+  # assignments that used to sit inside this c() were leaking variables into the
+  # function body as a side effect of building the vector. Values are unchanged.
+  n_tot <- nrow(df_in)
   pix_sig_TOT <- c(
-    # percent of significantly different DART pixels that show a positive effect:
-    round((table(df_in[[col_sig]]) / nrow(df_in)) * 100, 1)[['TRUE']],
-    pix_sig_pos <- round((nrow(df_in[df_in[[col_sig]] == T & df_in[[col_effect]] > 0, ]) / nrow(df_in)) * 100, 1),
-    # percent of significantly different DART pixels that show a negative effect:
-    pix_sig_neg <- round((nrow(df_in[df_in[[col_sig]] == T & df_in[[col_effect]] < 0, ]) / nrow(df_in)) * 100, 1)
+    # percent of pixels with a significant DART result:
+    round(100 * mean(df_in[[col_sig]]), 1),
+    # percent of all pixels that are significant AND positive:
+    round(100 * sum(df_in[[col_sig]] & df_in[[col_effect]] > 0) / n_tot, 1),
+    # percent of all pixels that are significant AND negative:
+    round(100 * sum(df_in[[col_sig]] & df_in[[col_effect]] < 0) / n_tot, 1)
   )
   # by-treatment DART significance
   pix_sig_TX <- df_in |>
@@ -653,37 +661,22 @@ print_summary_name <- function(xx, ind, type) {
     strsplit('_') |>
     _[[1]]
   
-  z0 <- paste(yy[1], yy[2], collapse = '_')
-  z1 <- paste('cover: ', yy[3], ', objective:', z0, collapse = '')
+  # `sep`, not `collapse`. paste(a, b, collapse = '_') collapses a result that is
+  # already length 1, so the separator was never applied and `z0` came back as
+  # "decrease afg" - the objective with a space where its underscore belongs,
+  # which is not the key any other part of the project uses. z1 is built with
+  # paste0 for the same reason: paste()'s default sep = ' ' was adding a second
+  # space after "cover:" and a space before the comma, so every `###` section
+  # heading in 2_sample_size_checks.Rmd rendered as
+  # "cover:  AFG , objective: decrease afg".
+  z0 <- paste(yy[1], yy[2], sep = '_')
+  z1 <- paste0('cover: ', yy[3], ', objective: ', z0)
     
   zz <- ifelse(type == 4, z0, yy[type])
   zz <- ifelse(type == 5, z1, zz)
     
   return(zz)
     
-}
-make_excl_table <- function(summary_table, tbl, ...) {
-  
-  tbl <- match.arg(tbl, choices = c('tbl_eco', 'tbl_tx'))
-  tbl_data <- summary_table[[tbl]]
-  
-  excl_ecos <- list(...)
-  
-  excl_cols <- lapply(excl_ecos, paste, collapse = ', ')
-  
-  excl_per <- sapply(seq_along(excl_ecos), function(i) {
-    combined <- unlist(excl_ecos[1:i])
-    round((sum(tbl_data[names(tbl_data) %in% combined]) / sum(tbl_data)) * 100, 2)
-  })
-  
-  excl_lab <- sapply(seq_along(excl_cols), function(i) {
-    paste(unlist(excl_cols[1:i]), collapse = ', ')
-  })
-  
-  return(data.frame(
-    lab = excl_lab,
-    per = paste(excl_per, '%')
-  ))
 }
 reduce_s0 <- function(input, coarse_tx = T) {
   # Turns s_0$input into the per-objective summary table: one row per objective x
@@ -706,19 +699,15 @@ reduce_s0 <- function(input, coarse_tx = T) {
     input$objective <- rep(single_obj, nrow(input))
     
     if (!('intended_direction' %in% colnames(input))) {
-      int_dir <- input$objective |>
-        unique() |>
-        strsplit('_') |>
-        unlist() |>
-        subset(c(T, F))
-      
-      if (int_dir == 'decrease') {
-        input$intended_direction <- ifelse(input$effect < 0, T, F)
-      } else if (int_dir == 'increase') {
-        input$intended_direction <- ifelse(input$effect > 0, T, F)
-      } else {
-        stop('intended direction assignment failed')
-      }
+      # Resolved through get_intended_sign() rather than re-derived here. This
+      # block used to split the objective on '_' and branch on 'decrease' /
+      # 'increase' itself, which made it a SECOND implementation of the mapping
+      # get_intended_sign() exists to own. The two agreed, but nothing made them
+      # agree - and summarize_sig_effect()'s own comment already asserted that
+      # reduce_s0() went through get_intended_sign(), which was not true. Values
+      # are unchanged: an effect of exactly zero is unintended either way.
+      input$intended_direction <- sign(input$effect) == get_intended_sign(single_obj)
+
       
       #input$desired <- rowSums(data.frame(input$sig, input$intended_direction))
       input$sig_des <- input$sig == T & input$intended_direction == T
@@ -744,7 +733,14 @@ reduce_s0 <- function(input, coarse_tx = T) {
       grp_perc_sig = round((grp_n_sig / grp_n_pix) * 100, 2),
       grp_perc_int = round((grp_n_sig_int / grp_n_sig) * 100, 2),
       grp_perc_uni = round((grp_n_sig_uni / grp_n_sig) * 100, 2),
-      .groups = 'drop_last'
+      # 'drop', not 'drop_last'. The summarise groups by four columns, so
+      # 'drop_last' handed back a frame still grouped by the first three - and a
+      # grouped_df makes every later verb silently per-group: a mutate() adding
+      # a share-of-total column divided each row by its own group's total and
+      # returned 1 for every row. Nothing downstream depended on the grouping
+      # (the one caller ends in as.data.frame()), so dropping it changes no
+      # current number and removes the trap.
+      .groups = 'drop'
     )
   
   return(output)
@@ -828,7 +824,7 @@ compare_related_directions <- function(
 }
 summarize_sig_effect <- function(
     df, group_col, effect_dir = c('positive', 'negative', 'intended', 'unintended'),
-    objective = NULL, baseline = NULL, run_pairwise = TRUE, label = group_col,
+    objective = NULL, baseline = NULL, run_pairwise = FALSE, label = group_col,
     sig_col = 'sig', effect_col = 'effect'
 ) {
   # Percentage of pixels in each level of `group_col` carrying a significant
@@ -849,6 +845,16 @@ summarize_sig_effect <- function(
   #
   # The sign is resolved through get_intended_sign(), never hard-coded, so this
   # agrees with label_intended(), reduce_s0() and intended_dir_word().
+  #
+  # `run_pairwise` defaults to FALSE. It was TRUE, with all fifteen call sites in
+  # 2_sample_size_checks.Rmd overriding it - so the default was the setting the
+  # report had decided against, and the only way to get the report's behaviour
+  # was to remember to ask for it. The off position is also the defensible one:
+  # the Fisher test below treats pixels as independent replicates, which the
+  # report's own standing caveat says they are not (pixels inside a polygon are
+  # not independent), and across hundreds of thousands of pixels it returns a
+  # vanishing p value for any difference at all. The machinery is kept for a
+  # caller who wants it on a polygon-level frame, where the assumption holds.
 
   effect_dir <- match.arg(effect_dir)
 

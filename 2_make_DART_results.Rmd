@@ -8,7 +8,7 @@ output: html_document
 ## Notes
 
 * This document reports results **across objectives**: the cross-objective direction checks, then every table and figure compiled from all five objective x cover response combinations, then the interpretation. It does not contain the per-objective sections. Those - the pixel counts, the sparse treatment x ecoregion combinations, what each sample-size filter removed, the count histograms, and each objective's own results and interpretation - are in `2_sample_size_checks.Rmd`, which is where the filtering and sample-size decisions are made and documented. The bulky per-ecoregion reference panels are in `2_raw_result_graphs.Rmd`.
-* Nothing in this document computes what it displays, and nothing here sets a threshold. `0_DART_setup.R` does both, for all three documents at once, so a threshold change takes effect everywhere and no two documents can report different numbers for the same quantity.
+* Nothing in this document computes what it displays, and nothing here sets a threshold. `2_results_setup.R` does both, for all three documents at once, so a threshold change takes effect everywhere and no two documents can report different numbers for the same quantity.
 * Every compiled table below is therefore built on post-filter data, and on *unequally* filtered data, since the thresholds differ by objective. The filtering log is the first thing compiled for that reason: read it before comparing objectives to each other.
 * The document runs in this order: terminology, the cross-objective direction checks, the compiled tables and figures, and last the hand-written interpretation - placed at the end so that it can refer back to evidence the reader has already passed.
 
@@ -19,7 +19,7 @@ output: html_document
 # that is where the script's objects have to land.
 #
 # What the script does: reads the input file, sets the three sample-size
-# thresholds, applies the filters, and builds each objective's copy of the eight
+# thresholds, applies the filters, and builds each objective's copy of the nine
 # compiled tables under object names of the form `<prefix><objective>_<COVER>`.
 # collect_obj_tables(prefix) is what gathers those copies into the cross-objective
 # tables below, which is why the naming convention is load-bearing rather than
@@ -30,7 +30,7 @@ output: html_document
 # per-objective write-up in 2_sample_size_checks.Rmd is static, though, so a new
 # objective also needs a section pasted in there, or it will appear in every
 # table below with nothing describing it.
-source('0_DART_setup.R', local = knitr::knit_global())
+source('2_results_setup.R', local = knitr::knit_global())
 
 # Messages and warnings are suppressed document-wide, so that a "Loading
 # required package" or dplyr grouping message from a helper cannot land in the
@@ -119,17 +119,7 @@ txeco_post_all  <- collect_obj_tables('txeco_post_')
 summary_tbl_all <- collect_obj_tables('summary_tbl_')
 filter_log_all  <- collect_obj_tables('filter_log_')
 
-# The per-polygon summary is the one compiled table with no per-objective copy to
-# gather: it is computed here in one pass straight off `summaries_mod`, since the
-# table and the figure below are only meaningful with every objective on them.
-poly_sig_all <- do.call(rbind, lapply(seq_along(summaries_mod), function(i) {
-  nm <- names(summaries_mod)[i]
-  summarize_poly_sig(
-    summaries_mod[[i]]$input,
-    objective_label = sub('_[A-Z]+$', '', nm),
-    cover_label     = sub('^.*_', '', nm)
-  )
-}))
+poly_sig_all    <- collect_obj_tables('poly_sig_')
 ```
 
 #### Sample-size filtering applied

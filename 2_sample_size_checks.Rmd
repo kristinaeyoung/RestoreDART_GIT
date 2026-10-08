@@ -45,10 +45,10 @@ A final section, **Overall results and interpretation, all objectives**, closes 
 # Adding an objective means adding its rows to the input data and copying a
 # section here (change its `obj_nm` literal, renumber its chunk labels). The
 # compiled tables in 2_make_DART_results.Rmd pick it up with no edit at all,
-# because 0_DART_setup.R loops over whatever `summaries` contains - but the
+# because 2_results_setup.R loops over whatever `summaries` contains - but the
 # per-objective write-up is no longer generated, so without a pasted section the
 # new objective appears in those tables with nothing describing it.
-source('0_DART_setup.R', local = knitr::knit_global())
+source('2_results_setup.R', local = knitr::knit_global())
 
 # Hand-written interpretation, one character vector per objective, each element
 # one markdown bullet. Each objective's vector is defined in its own section,
@@ -74,7 +74,7 @@ obj_nm <- 'decrease_afg_AFG'
 stopifnot(obj_nm %in% names(summaries))
 r_ind <- match(obj_nm, names(summaries))
 
-# Everything this section needs was computed once in 0_DART_setup.R. It is
+# Everything this section needs was computed once in 2_results_setup.R. It is
 # unpacked into bare local names so the prose below can go on quoting
 # `min_txeco_n_i`, `n_excl_combo`, `year_trunc`, `int_word` and the rest by name.
 # The setup script deliberately leaves none of these defined, so a name missing
@@ -173,7 +173,7 @@ knitr::kable(
 The pixel cutoff for each (treatment × ecoregion) combination was `r min_txeco_n_i`.
 
 ```{r results-1_6, echo = F}
-# The three filters were applied in 0_DART_setup.R, in the order documented
+# The three filters were applied in 2_results_setup.R, in the order documented
 # there - sparse (treatment x ecoregion) cells, then depopulated treatment or
 # ecoregion levels, then the late-year tail - and the result was written into
 # `summaries_mod`. This chunk takes that outcome and the bookkeeping rather than
@@ -430,7 +430,7 @@ So the two segment labels add up to the number of *significant* pixels in that y
 The figure below switches from counting significant pixels to measuring them: among significant pixels only, what was the mean DART effect in each year since treatment, and in which year was that mean largest? Positive and negative effects are summarized separately throughout.
 
 ```{r results-1_18, echo = F}
-# Both computed in 0_DART_setup.R, which also keeps the copy that
+# Both computed in 2_results_setup.R, which also keeps the copy that
 # collect_obj_tables('peak_effect_') gathers for the compiled table in
 # 2_make_DART_results.Rmd. The figure below is handed the peak table rather than
 # recomputing it, so the dashed peak lines cannot disagree with the table above.
@@ -472,7 +472,7 @@ peak_bullets <- vapply(seq_len(nrow(peak_effect)), function(i) {
 Note that the year with the largest mean effect need not be the year with the most significant pixels: the two questions can peak at different times, and a peak that lands on the last observed year is flagged as censored above for the same reason as in the by-polygon table further down.
 
 ```{r results-1_19, echo = F}
-# The 1-5 / 6-10 / 11-15 / 16+ binning is done in 0_DART_setup.R, on a local
+# The 1-5 / 6-10 / 11-15 / 16+ binning is done in 2_results_setup.R, on a local
 # copy of the input so the frame in `summaries_mod` never picks up a
 # reporting-only column.
 sig_by_bin <- .st$sig_by_bin
@@ -656,7 +656,7 @@ obj_nm <- 'decrease_shr_SHR'
 stopifnot(obj_nm %in% names(summaries))
 r_ind <- match(obj_nm, names(summaries))
 
-# Everything this section needs was computed once in 0_DART_setup.R. It is
+# Everything this section needs was computed once in 2_results_setup.R. It is
 # unpacked into bare local names so the prose below can go on quoting
 # `min_txeco_n_i`, `n_excl_combo`, `year_trunc`, `int_word` and the rest by name.
 # The setup script deliberately leaves none of these defined, so a name missing
@@ -755,7 +755,7 @@ knitr::kable(
 The pixel cutoff for each (treatment × ecoregion) combination was `r min_txeco_n_i`.
 
 ```{r results-2_6, echo = F}
-# The three filters were applied in 0_DART_setup.R, in the order documented
+# The three filters were applied in 2_results_setup.R, in the order documented
 # there - sparse (treatment x ecoregion) cells, then depopulated treatment or
 # ecoregion levels, then the late-year tail - and the result was written into
 # `summaries_mod`. This chunk takes that outcome and the bookkeeping rather than
@@ -1012,7 +1012,7 @@ So the two segment labels add up to the number of *significant* pixels in that y
 The figure below switches from counting significant pixels to measuring them: among significant pixels only, what was the mean DART effect in each year since treatment, and in which year was that mean largest? Positive and negative effects are summarized separately throughout.
 
 ```{r results-2_18, echo = F}
-# Both computed in 0_DART_setup.R, which also keeps the copy that
+# Both computed in 2_results_setup.R, which also keeps the copy that
 # collect_obj_tables('peak_effect_') gathers for the compiled table in
 # 2_make_DART_results.Rmd. The figure below is handed the peak table rather than
 # recomputing it, so the dashed peak lines cannot disagree with the table above.
@@ -1054,7 +1054,7 @@ peak_bullets <- vapply(seq_len(nrow(peak_effect)), function(i) {
 Note that the year with the largest mean effect need not be the year with the most significant pixels: the two questions can peak at different times, and a peak that lands on the last observed year is flagged as censored above for the same reason as in the by-polygon table further down.
 
 ```{r results-2_19, echo = F}
-# The 1-5 / 6-10 / 11-15 / 16+ binning is done in 0_DART_setup.R, on a local
+# The 1-5 / 6-10 / 11-15 / 16+ binning is done in 2_results_setup.R, on a local
 # copy of the input so the frame in `summaries_mod` never picks up a
 # reporting-only column.
 sig_by_bin <- .st$sig_by_bin
@@ -1237,7 +1237,7 @@ obj_nm <- 'decrease_tre_TRE'
 stopifnot(obj_nm %in% names(summaries))
 r_ind <- match(obj_nm, names(summaries))
 
-# Everything this section needs was computed once in 0_DART_setup.R. It is
+# Everything this section needs was computed once in 2_results_setup.R. It is
 # unpacked into bare local names so the prose below can go on quoting
 # `min_txeco_n_i`, `n_excl_combo`, `year_trunc`, `int_word` and the rest by name.
 # The setup script deliberately leaves none of these defined, so a name missing
@@ -1336,7 +1336,7 @@ knitr::kable(
 The pixel cutoff for each (treatment × ecoregion) combination was `r min_txeco_n_i`.
 
 ```{r results-3_6, echo = F}
-# The three filters were applied in 0_DART_setup.R, in the order documented
+# The three filters were applied in 2_results_setup.R, in the order documented
 # there - sparse (treatment x ecoregion) cells, then depopulated treatment or
 # ecoregion levels, then the late-year tail - and the result was written into
 # `summaries_mod`. This chunk takes that outcome and the bookkeeping rather than
@@ -1593,7 +1593,7 @@ So the two segment labels add up to the number of *significant* pixels in that y
 The figure below switches from counting significant pixels to measuring them: among significant pixels only, what was the mean DART effect in each year since treatment, and in which year was that mean largest? Positive and negative effects are summarized separately throughout.
 
 ```{r results-3_18, echo = F}
-# Both computed in 0_DART_setup.R, which also keeps the copy that
+# Both computed in 2_results_setup.R, which also keeps the copy that
 # collect_obj_tables('peak_effect_') gathers for the compiled table in
 # 2_make_DART_results.Rmd. The figure below is handed the peak table rather than
 # recomputing it, so the dashed peak lines cannot disagree with the table above.
@@ -1635,7 +1635,7 @@ peak_bullets <- vapply(seq_len(nrow(peak_effect)), function(i) {
 Note that the year with the largest mean effect need not be the year with the most significant pixels: the two questions can peak at different times, and a peak that lands on the last observed year is flagged as censored above for the same reason as in the by-polygon table further down.
 
 ```{r results-3_19, echo = F}
-# The 1-5 / 6-10 / 11-15 / 16+ binning is done in 0_DART_setup.R, on a local
+# The 1-5 / 6-10 / 11-15 / 16+ binning is done in 2_results_setup.R, on a local
 # copy of the input so the frame in `summaries_mod` never picks up a
 # reporting-only column.
 sig_by_bin <- .st$sig_by_bin
@@ -1815,7 +1815,7 @@ obj_nm <- 'increase_pfg_PFG'
 stopifnot(obj_nm %in% names(summaries))
 r_ind <- match(obj_nm, names(summaries))
 
-# Everything this section needs was computed once in 0_DART_setup.R. It is
+# Everything this section needs was computed once in 2_results_setup.R. It is
 # unpacked into bare local names so the prose below can go on quoting
 # `min_txeco_n_i`, `n_excl_combo`, `year_trunc`, `int_word` and the rest by name.
 # The setup script deliberately leaves none of these defined, so a name missing
@@ -1914,7 +1914,7 @@ knitr::kable(
 The pixel cutoff for each (treatment × ecoregion) combination was `r min_txeco_n_i`.
 
 ```{r results-4_6, echo = F}
-# The three filters were applied in 0_DART_setup.R, in the order documented
+# The three filters were applied in 2_results_setup.R, in the order documented
 # there - sparse (treatment x ecoregion) cells, then depopulated treatment or
 # ecoregion levels, then the late-year tail - and the result was written into
 # `summaries_mod`. This chunk takes that outcome and the bookkeeping rather than
@@ -2171,7 +2171,7 @@ So the two segment labels add up to the number of *significant* pixels in that y
 The figure below switches from counting significant pixels to measuring them: among significant pixels only, what was the mean DART effect in each year since treatment, and in which year was that mean largest? Positive and negative effects are summarized separately throughout.
 
 ```{r results-4_18, echo = F}
-# Both computed in 0_DART_setup.R, which also keeps the copy that
+# Both computed in 2_results_setup.R, which also keeps the copy that
 # collect_obj_tables('peak_effect_') gathers for the compiled table in
 # 2_make_DART_results.Rmd. The figure below is handed the peak table rather than
 # recomputing it, so the dashed peak lines cannot disagree with the table above.
@@ -2213,7 +2213,7 @@ peak_bullets <- vapply(seq_len(nrow(peak_effect)), function(i) {
 Note that the year with the largest mean effect need not be the year with the most significant pixels: the two questions can peak at different times, and a peak that lands on the last observed year is flagged as censored above for the same reason as in the by-polygon table further down.
 
 ```{r results-4_19, echo = F}
-# The 1-5 / 6-10 / 11-15 / 16+ binning is done in 0_DART_setup.R, on a local
+# The 1-5 / 6-10 / 11-15 / 16+ binning is done in 2_results_setup.R, on a local
 # copy of the input so the frame in `summaries_mod` never picks up a
 # reporting-only column.
 sig_by_bin <- .st$sig_by_bin
@@ -2400,7 +2400,7 @@ obj_nm <- 'increase_shr_SHR'
 stopifnot(obj_nm %in% names(summaries))
 r_ind <- match(obj_nm, names(summaries))
 
-# Everything this section needs was computed once in 0_DART_setup.R. It is
+# Everything this section needs was computed once in 2_results_setup.R. It is
 # unpacked into bare local names so the prose below can go on quoting
 # `min_txeco_n_i`, `n_excl_combo`, `year_trunc`, `int_word` and the rest by name.
 # The setup script deliberately leaves none of these defined, so a name missing
@@ -2499,7 +2499,7 @@ knitr::kable(
 The pixel cutoff for each (treatment × ecoregion) combination was `r min_txeco_n_i`.
 
 ```{r results-5_6, echo = F}
-# The three filters were applied in 0_DART_setup.R, in the order documented
+# The three filters were applied in 2_results_setup.R, in the order documented
 # there - sparse (treatment x ecoregion) cells, then depopulated treatment or
 # ecoregion levels, then the late-year tail - and the result was written into
 # `summaries_mod`. This chunk takes that outcome and the bookkeeping rather than
@@ -2756,7 +2756,7 @@ So the two segment labels add up to the number of *significant* pixels in that y
 The figure below switches from counting significant pixels to measuring them: among significant pixels only, what was the mean DART effect in each year since treatment, and in which year was that mean largest? Positive and negative effects are summarized separately throughout.
 
 ```{r results-5_18, echo = F}
-# Both computed in 0_DART_setup.R, which also keeps the copy that
+# Both computed in 2_results_setup.R, which also keeps the copy that
 # collect_obj_tables('peak_effect_') gathers for the compiled table in
 # 2_make_DART_results.Rmd. The figure below is handed the peak table rather than
 # recomputing it, so the dashed peak lines cannot disagree with the table above.
@@ -2798,7 +2798,7 @@ peak_bullets <- vapply(seq_len(nrow(peak_effect)), function(i) {
 Note that the year with the largest mean effect need not be the year with the most significant pixels: the two questions can peak at different times, and a peak that lands on the last observed year is flagged as censored above for the same reason as in the by-polygon table further down.
 
 ```{r results-5_19, echo = F}
-# The 1-5 / 6-10 / 11-15 / 16+ binning is done in 0_DART_setup.R, on a local
+# The 1-5 / 6-10 / 11-15 / 16+ binning is done in 2_results_setup.R, on a local
 # copy of the input so the frame in `summaries_mod` never picks up a
 # reporting-only column.
 sig_by_bin <- .st$sig_by_bin

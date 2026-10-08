@@ -22,17 +22,43 @@
 # R version 
 library(dplyr)
 
-out_file <- '../RestoreDART_DATA/MIXED_MODELS/1_combined_filter_input_data_06192026.csv'
-tx_key_fl <- '../results/tx_key_BEM.csv'
+# ---- paths ---------------------------------------------------------------
+
+# Every input this script reads was copied to ../analysis_inputs on 07 Oct 2026,
+# mirroring the ../RestoreDART_DATA tree exactly, so repointing the script was a
+# prefix change and nothing else. ../RestoreDART_DATA remains the authoritative
+# source and these copies will go stale if it changes; provenance and the list of
+# what was deliberately NOT copied are in
+# ../analysis_inputs/0_README_analysis_inputs.txt.
+
+# Retired paths, kept as the record of where this script used to read and write.
+# The output moved out of ../RestoreDART_DATA because that directory is read-only
+# to the analysis and already held four date-stamped versions of this file.
+# out_file  <- '../RestoreDART_DATA/MIXED_MODELS/1_combined_filter_input_data_06192026.csv'
+# tx_key_fl <- '../results/tx_key_BEM.csv'
+
+# Output version stamp, MMDDYYYY, the same convention as the model run
+# directories and the manuscript versions. `in_stamp` in 2_results_setup.R must
+# be bumped to match whenever this script is re-run, or the report will keep
+# reading the previous version. The two literals are deliberately not derived
+# from Sys.Date(): a stamp that moved on its own would silently decouple the
+# report from the file it describes.
+out_stamp <- '10072026'
+
+out_file  <- paste0('../analysis_inputs/RestoreDART_DATA/MIXED_MODELS/',
+                    '1_combined_filter_input_data_', out_stamp, '.csv')
+tx_key_fl <- '../analysis_inputs/results/tx_key_BEM.csv'
+
+stopifnot(dir.exists(dirname(out_file)), file.exists(tx_key_fl))
 
 # import
 tx_key <- read.csv(tx_key_fl)
-new_ai <- read.csv('../RestoreDART_DATA/CLIMATE_DATA/AI_21_24.csv') |>
+new_ai <- read.csv('../analysis_inputs/RestoreDART_DATA/CLIMATE_DATA/AI_21_24.csv') |>
   select(-ActnDsc, -trtYear, -post_fr, -dat_src, -trtID)
-new_spei <- read.csv('../RestoreDART_DATA/CLIMATE_DATA/SPEI_21_24.csv') |>
+new_spei <- read.csv('../analysis_inputs/RestoreDART_DATA/CLIMATE_DATA/SPEI_21_24.csv') |>
   select(-ActnDsc, -trtYear, -post_fr, -dat_src, -trtID)
-objectives <- readxl::read_excel("../RestoreDART_DATA/objectives/MARCH2025_OBJECTIVES_04052026.xlsx")
-aridity_long <- read.csv('../RestoreDART_DATA/CLIMATE_DATA/Annual_Mean_AI_For_DART_1km.csv', header = T) |>
+objectives <- readxl::read_excel("../analysis_inputs/RestoreDART_DATA/objectives/MARCH2025_OBJECTIVES_04052026.xlsx")
+aridity_long <- read.csv('../analysis_inputs/RestoreDART_DATA/CLIMATE_DATA/Annual_Mean_AI_For_DART_1km.csv', header = T) |>
   left_join(new_ai) |>
   tidyr::pivot_longer(
     cols = starts_with("X"), 
@@ -42,7 +68,7 @@ aridity_long <- read.csv('../RestoreDART_DATA/CLIMATE_DATA/Annual_Mean_AI_For_DA
   mutate(Year = as.integer(sub("X", "", Year)))  |> 
   select(-system.index, -plyID_g) |>
   rename(PolyID = plyID_n)
-spei_long <- read.csv('../RestoreDART_DATA/CLIMATE_DATA/Annual_Mean_SPEI_For_DART_1km.csv', header = T) |>
+spei_long <- read.csv('../analysis_inputs/RestoreDART_DATA/CLIMATE_DATA/Annual_Mean_SPEI_For_DART_1km.csv', header = T) |>
   left_join(new_spei) |>
   tidyr::pivot_longer(
     cols = starts_with("X"),  
@@ -52,17 +78,17 @@ spei_long <- read.csv('../RestoreDART_DATA/CLIMATE_DATA/Annual_Mean_SPEI_For_DAR
   mutate(Year = as.integer(sub("X", "", Year)))  |> 
   select(-system.index, -plyID_g) |>
   rename(PolyID = plyID_n)
-preformance <- read.csv('../RestoreDART_DATA/MIXED_MODELS/MIXEDMODEL_model_performance_all_RestoreDART.csv', header = T) |>
+preformance <- read.csv('../analysis_inputs/RestoreDART_DATA/MIXED_MODELS/MIXEDMODEL_model_performance_all_RestoreDART.csv', header = T) |>
   select(-nyrs_pretrt, -RMSE, -RelRMSE, -point.effect)
-ecoregion <- read.csv("../RestoreDART_DATA/SPATIAL_DATA/RestoreDART_projects_with_ecoregion_info.csv", header = T) |>
+ecoregion <- read.csv("../analysis_inputs/RestoreDART_DATA/SPATIAL_DATA/RestoreDART_projects_with_ecoregion_info.csv", header = T) |>
   select(polyID, us_l4code, us_l4name) |>
   rename(PolyID = polyID)
-dart <- read.csv('../RestoreDART_DATA/MIXED_MODELS/DART_combined_BEM_04032026.csv')
-pre_treatment <- read.csv('../RestoreDART_DATA/PRE_TREATMENT/rap_5ybt_summary.csv', header = T) |>
+dart <- read.csv('../analysis_inputs/RestoreDART_DATA/MIXED_MODELS/DART_combined_BEM_04032026.csv')
+pre_treatment <- read.csv('../analysis_inputs/RestoreDART_DATA/PRE_TREATMENT/rap_5ybt_summary.csv', header = T) |>
   select(PolyID, target_id, fun_group, mean_cover_5YBT)
-soil <- read.csv('../RestoreDART_DATA/MIXED_MODELS/xx_soil_df.csv') |>
+soil <- read.csv('../analysis_inputs/RestoreDART_DATA/MIXED_MODELS/xx_soil_df.csv') |>
   distinct()
-coords <- read.csv("../RestoreDART_DATA/MIXED_MODELS/xx_coord_df.csv") |>
+coords <- read.csv("../analysis_inputs/RestoreDART_DATA/MIXED_MODELS/xx_coord_df.csv") |>
   rename('PolyID' = polygon, 'target_id' = SOLIS_pixel) |>
   select(-ID, -RAP_pixel) |>
   group_by(PolyID, target_id) |>

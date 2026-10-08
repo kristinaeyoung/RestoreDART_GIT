@@ -38,7 +38,15 @@ fig_conventions <- function() {
     text         = 'black',    # axis text and facet strip text
     label_inside = 'white',    # a label drawn inside a filled bar segment
     separator    = 'white',    # tile borders and bar outlines
-    open_fill    = 'white'     # interior of a hollow (censored) point
+    open_fill    = 'white',    # interior of a hollow (censored) point
+    seq          = c('grey20', 'grey40', 'grey60')
+    # a sequential ramp for an UNORDERED multi-level fill carrying no direction
+    # (the variance components). Added rather than left as a literal in the one
+    # figure that needs it, because the existing entries do not cover the case:
+    # `mid` (grey90) is the zero point of the diverging heatmap fill, and a
+    # grey90 segment cannot carry a `label_inside` label. Every value here is
+    # dark enough that white text on it stays readable, which is the property
+    # that makes it a ramp rather than three arbitrary greys.
   )
 
   size <- list(
@@ -332,6 +340,270 @@ plot_poly_sig_summary <- function(
   return(p0)
 
 }
+plot_model_resid <- function(
+    resid_df, title = NULL, subtitle = NULL,
+    x_lab = 'Fitted value', y_lab = 'Residual') {
+  # Residuals against fitted values for one fitted mixed model, as a ggplot so
+  # that the object can be saved alongside the .png and re-printed by
+  # 3_report_linear_models.Rmd without the model being refit.
+  #
+  # Takes a data frame with `fitted` and `resid` columns rather than the fitted
+  # model, for two reasons: the caller is the one that knows how many points to
+  # subsample (a full objective brings 10^5-10^6 residuals, and embedding them
+  # in a saved ggplot object makes the .Rdata unusable), and keeping lme4 out of
+  # this file leaves plot_functions.R dependent on ggplot2 alone.
+
+  require(ggplot2)
+  stopifnot(all(c('fitted', 'resid') %in% colnames(resid_df)))
+
+  fc <- fig_conventions()
+
+  ggplot(resid_df, aes(x = fitted, y = resid)) +
+    geom_hline(yintercept = 0, linetype = 'dashed',
+               linewidth = fc$line$zero, color = fc$col$text) +
+    geom_point(size = fc$size$point, alpha = fc$alpha$faded,
+               color = fc$col$neutral) +
+    labs(title = title, subtitle = subtitle, x = x_lab, y = y_lab) +
+    fc$theme$base
+}
+
+plot_model_qq <- function(
+    resid_df, title = NULL, subtitle = NULL,
+    x_lab = 'Theoretical quantile', y_lab = 'Sample quantile') {
+  # Normal Q-Q plot of one model's residuals. Same argument convention as
+  # plot_model_resid() - a subsampled data frame, not a fitted model - so the
+  # two are drawn from one object and cannot disagree about which residuals they
+  # are showing.
+  #
+  # The reference line is stat_qq_line()'s, drawn through the first and third
+  # quartiles rather than through the origin at slope 1, which is the usual
+  # convention and the one qqline() uses.
+
+  require(ggplot2)
+  stopifnot('resid' %in% colnames(resid_df))
+
+  fc <- fig_conventions()
+
+  ggplot(resid_df, aes(sample = resid)) +
+    stat_qq(size = fc$size$point, alpha = fc$alpha$faded,
+            color = fc$col$neutral) +
+    stat_qq_line(linetype = 'dashed', linewidth = fc$line$annot,
+                 color = fc$col$text) +
+    labs(title = title, subtitle = subtitle, x = x_lab, y = y_lab) +
+    fc$theme$base
+}
+
+plot_model_scale_location <- function(
+    resid_df, title = NULL, subtitle = NULL,
+    x_lab = 'Fitted value', y_lab = expression(sqrt(abs(Residual))), span = 0.5) {
+  # Scale-location plot: the square root of the absolute residual against the
+  # fitted value, with a loess trend. Bates, Machler, Bolker and Walker (2015,
+  # JSS 67(1), section 5.2.3) name this as one of the three standard lme4
+  # diagnostics alongside fitted-vs-residual and Q-Q, and note that lme4's
+  # version is built on RAW rather than standardized residuals - which is what
+  # this does, since `resid_df` carries resid(fit) unstandardized.
+  #
+  # It is the plot that shows heteroscedasticity most directly, and that is the
+  # assumption most at risk here: a pixel-level DART effect is an estimate with
+  # its own standard error, and that error is not constant across the range of
+  # cover the pixels span. A trend line that rises with the fitted value says
+  # the model's single residual variance is describing two different things.
+
+  require(ggplot2)
+  stopifnot(all(c('fitted', 'resid') %in% colnames(resid_df)))
+
+  fc  <- fig_conventions()
+  tbl <- resid_df
+  tbl$sqrt_abs <- sqrt(abs(tbl$resid))
+
+  ggplot(tbl, aes(x = fitted, y = sqrt_abs)) +
+    geom_point(size = fc$size$point, alpha = fc$alpha$faded, color = fc$col$neutral) +
+    geom_smooth(method = 'loess', span = span, se = FALSE,
+                color = fc$col$pos, linewidth = fc$line$series) +
+    labs(title = title, subtitle = subtitle, x = x_lab, y = y_lab) +
+    fc$theme$base
+}
+
+plot_model_ranef_qq <- function(
+    ranef_df, title = NULL, subtitle = NULL,
+    x_lab = 'Theoretical quantile', y_lab = 'Conditional mode') {
+  # Normal Q-Q of the CONDITIONAL MODES of the random effects, one panel per
+  # grouping factor. Bates et al. (2015, section 5.2.3) recommend the qqmath
+  # method on `ranef(fit)` output for exactly this, and it tests an assumption
+  # none of the residual plots touch: the residual Q-Q asks whether the
+  # within-pixel errors are normal, while this asks whether the POLYGON and
+  # PIXEL intercepts are - a separate distributional assumption that the model
+  # makes and that nothing else in this project checks.
+  #
+  # Takes `as.data.frame(ranef(fit))`, which carries `grpvar` (the grouping
+  # factor), `term`, `grp` (the level), `condval` and `condsd`. Passing the
+  # data frame rather than the fitted model keeps lme4 out of this file, the
+  # same argument convention as plot_model_resid().
+
+  require(ggplot2)
+  stopifnot(all(c('grpvar', 'condval') %in% colnames(ranef_df)))
+
+  fc <- fig_conventions()
+
+  ggplot(ranef_df, aes(sample = condval)) +
+    stat_qq(size = fc$size$point, alpha = fc$alpha$faded, color = fc$col$neutral) +
+    stat_qq_line(linetype = 'dashed', linewidth = fc$line$annot, color = fc$col$text) +
+    facet_wrap(vars(grpvar), scales = 'free_y') +
+    labs(title = title, subtitle = subtitle, x = x_lab, y = y_lab) +
+    fc$theme$facet
+}
+
+plot_model_coefs <- function(
+    coef_tbl, title = NULL, subtitle = NULL,
+    x_lab = 'Estimate (response units)', y_lab = NULL,
+    ci_mult = 1.96, drop_intercept = T) {
+  # Fixed-effect estimates with confidence intervals for every objective's
+  # selected model, one panel per objective x cover response.
+  #
+  # `ci_mult` is the multiplier on the standard error, 1.96 by default for an
+  # approximate 95% interval. It is an argument rather than a literal because
+  # the interval is approximate either way - lme4 reports no denominator degrees
+  # of freedom - and a reader who wants the 1-SE version should not have to edit
+  # this function to get it.
+  #
+  # Colour marks whether that interval excludes zero, using the same two
+  # direction colours as every other figure in this report (see the terminology
+  # section of 2_make_DART_results.Rmd): they mean the RAW sign here, not the
+  # intended one, because a panel's terms are treatment contrasts and ecoregion
+  # contrasts whose relation to the objective's goal is not a property of the
+  # sign alone. `coef_tbl$intended_sign` carries the goal for a reader who wants
+  # to apply it.
+  #
+  # The y scale is free and the x scale is shared. That is the opposite of the
+  # usual rule for a compiled figure, and deliberate: the objectives do not have
+  # the same terms (each has its own surviving ecoregions and treatments), so a
+  # shared term axis would be mostly blank, while the estimate axis - the
+  # quantity being compared - stays common across panels.
+
+  require(ggplot2)
+  stopifnot(all(c('objective', 'cover', 'term', 'estimate') %in% colnames(coef_tbl)),
+            all(c('lo', 'hi') %in% colnames(coef_tbl)) || 'se' %in% colnames(coef_tbl))
+
+  fc <- fig_conventions()
+
+  tbl <- coef_tbl
+  if (drop_intercept) tbl <- tbl[tbl$term != '(Intercept)', ]
+  stopifnot(nrow(tbl) > 0)
+
+  # Use the interval the caller supplied, if it supplied one. confint() on a
+  # merMod returns a real interval by Wald approximation, likelihood profiling
+  # or parametric bootstrap (Bates et al. 2015, section 5.2.6), and only the
+  # Wald version is the symmetric estimate +/- a multiple of the standard error
+  # that the fallback below reconstructs. A profile or bootstrap interval is
+  # asymmetric, and rebuilding it from the SE would silently discard exactly
+  # the asymmetry that made it worth computing. `ci_mult` therefore applies
+  # only to the fallback.
+  if (!all(c('lo', 'hi') %in% colnames(tbl))) {
+    tbl$lo <- tbl$estimate - ci_mult * tbl$se
+    tbl$hi <- tbl$estimate + ci_mult * tbl$se
+  }
+
+  # drop = FALSE on the scale below, because a run in which every interval
+  # overlaps zero would otherwise silently lose two legend keys.
+  excl_zero  <- tbl$lo > 0 | tbl$hi < 0
+  flag_lev   <- c(unname(fc$dir$lab), 'Overlaps zero')
+  tbl$flag   <- factor(
+    ifelse(!excl_zero, 'Overlaps zero',
+           ifelse(tbl$estimate > 0, fc$dir$lab[['pos']], fc$dir$lab[['neg']])),
+    levels = flag_lev
+  )
+  flag_pal <- setNames(c(fc$col$pos, fc$col$neg, fc$col$neutral), flag_lev)
+
+  tbl$obj_lab <- obj_cover_label(tbl)
+
+  # Terms are ordered by their MEAN position within each model's own coefficient
+  # vector, not by first appearance across the whole table. The panels do not
+  # share a term set - each objective has its own surviving ecoregions - so a
+  # first-appearance ordering interleaves one objective's ecoregion contrasts
+  # ahead of another's `mean_cover_5YBT`, and with a free y scale each panel
+  # then shows the shared terms in a different order from its neighbour.
+  # Averaging the within-model position keeps every panel close to the order
+  # lmer reported and keeps the shared terms aligned between panels.
+  term_pos <- ave(seq_len(nrow(tbl)), paste(tbl$objective, tbl$cover),
+                  FUN = seq_along)
+  term_ord <- tapply(term_pos, tbl$term, mean)
+  tbl$term <- factor(tbl$term, levels = rev(names(sort(term_ord))))
+
+  ggplot(tbl, aes(x = estimate, y = term, color = flag)) +
+    geom_vline(xintercept = 0, linetype = 'dashed',
+               linewidth = fc$line$zero, color = fc$col$text) +
+    geom_pointrange(aes(xmin = lo, xmax = hi),
+                    linewidth = fc$line$annot, size = fc$size$pointrange) +
+    scale_color_manual(values = flag_pal, drop = FALSE,
+                       name = fc$lab$dir_legend) +
+    facet_wrap(vars(obj_lab), scales = 'free_y') +
+    labs(title = title, subtitle = subtitle, x = x_lab, y = y_lab) +
+    fc$theme$facet_legend
+}
+
+plot_model_varcomp <- function(
+    vc_tbl, title = NULL, subtitle = NULL,
+    x_lab = NULL, y_lab = '% of total variance', show_pct = T) {
+  # How each objective's selected model partitions its variance between
+  # polygons, between pixels within a polygon, and within a pixel across years.
+  # One stacked bar per objective x cover response.
+  #
+  # This is the quantitative form of the report's standing caveat that pixels
+  # inside a polygon are not independent replicates: a polygon term that takes
+  # most of the variance says the effective sample size is closer to the polygon
+  # count than to the pixel count.
+  #
+  # Fill comes from `fig_conventions()$col$seq`, the sequential grey ramp, which
+  # was added for this figure - see the note on that entry for why none of the
+  # existing colours covered the case.
+
+  require(ggplot2)
+  stopifnot(all(c('objective', 'cover', 'grp', 'pct_var') %in% colnames(vc_tbl)))
+
+  fc <- fig_conventions()
+
+  tbl         <- vc_tbl
+  tbl$obj_lab <- obj_cover_label(tbl)
+  tbl$grp     <- factor(tbl$grp, levels = rev(unique(tbl$grp)))
+
+  # Label positions are computed here, on the FULL table, rather than left to
+  # position_stack() in the label layer. position_stack() stacks whatever data
+  # the layer was given, so a layer filtered to the labellable segments would
+  # re-stack those segments against each other and put every label in the wrong
+  # place - a wrong figure that still renders. geom_col() puts the first factor
+  # level at the top of the bar, so the cumulative sum runs from the top down;
+  # the group total is used rather than a literal 100 so that rounding in
+  # `pct_var` cannot shift the labels off their segments.
+  tbl       <- tbl[order(tbl$obj_lab, as.integer(tbl$grp)), ]
+  tbl$lab_y <- ave(tbl$pct_var, tbl$obj_lab,
+                   FUN = \(pp) sum(pp) - (cumsum(pp) - pp / 2))
+
+  grey_pal <- setNames(
+    rep(fc$col$seq, length.out = nlevels(tbl$grp)),
+    levels(tbl$grp)
+  )
+
+  gg <- ggplot(tbl, aes(x = obj_lab, y = pct_var, fill = grp)) +
+    geom_col(color = fc$col$separator, linewidth = fc$line$separator) +
+    scale_fill_manual(values = grey_pal, name = 'Variance component') +
+    labs(title = title, subtitle = subtitle, x = x_lab, y = y_lab) +
+    fc$theme$facet_legend +
+    theme(axis.text.x = element_text(color = fc$col$text, angle = 45, hjust = 1))
+
+  # Segments below ~6% of the bar cannot hold a readable label; labelling them
+  # anyway produces overlapping text at the segment boundaries.
+  if (show_pct) {
+    lab_tbl <- tbl[tbl$pct_var >= 6, ]
+    gg <- gg + geom_text(
+      data = lab_tbl,
+      aes(y = lab_y, label = sprintf('%.1f', pct_var)),
+      size = fc$size$label_n, color = fc$col$label_inside
+    )
+  }
+
+  gg
+}
+
 obj_cover_label <- function(tbl) {
   # Two-line "objective\n(COVER)" axis/facet label, used by every figure drawn
   # from a table that was compiled ACROSS objectives. Kept as one function
@@ -671,107 +943,16 @@ plot_all_DART_time <- function(
     ggplot(aes(x = year_diff, y = effect, fill = sig)) +
     geom_col(position = position_dodge(width = 0.9), width = 0.85) +
     geom_hline(yintercept = 0) +
-    facet_wrap(~ get(tx_col)) +
+    # `vars(.data[[tx_col]])`, not `~ get(tx_col)`. The get() form happens to
+    # resolve - ggplot2 evaluates facet variables in a data mask that get() can
+    # reach - but it is the exact pattern that killed plot_eco() and plot_tx(),
+    # which both failed at draw time with "object 'us_l4name' not found" once
+    # the column was no longer also in the calling scope. .data[[ ]] looks the
+    # column up in the data and nowhere else, so it cannot be shadowed by, or
+    # accidentally satisfied by, an object of the same name.
+    facet_wrap(vars(.data[[tx_col]])) +
     labs(x = "Years since treatment", y = ylab, fill = flab, title = tlab) +
     fc$theme$facet_legend
-  
-  return(p0)
-  
-}
-plot_all_DART_sig <- function(
-    input_df, obj, ptype = 1, ftype = "",
-    min_n = 30, metric = c("net", "prop_sig"), show_n = FALSE
-) {
-  
-  require(dplyr)
-  require(ggplot2)
-  
-  fc <- fig_conventions()
-  
-  metric <- match.arg(metric)
-  
-  # ptype 1 facets by ecoregion, so us_l4name stays in the grouping.
-  # ptype 2 is meant to collapse across ecoregion - it must be dropped from the
-  # grouping *before* summarising, not just left out of facet_wrap() afterward,
-  # or every ecoregion's value gets drawn on top of the same tile.
-  group_vars <- if (ptype == 1) {
-    c("year_diff", "us_l4name", "tx_coarse")
-  } else if (ptype == 2) {
-    c("year_diff", "tx_coarse")
-  } else {
-    stop('bad ptype')
-  }
-  
-  fdf <- input_df |>
-    group_by(across(all_of(group_vars))) |>
-    summarise(
-      n_pix    = n(),
-      prop_sig = mean(sig, na.rm = TRUE),
-      prop_pos = mean(sig & effect > 0, na.rm = TRUE),
-      prop_neg = mean(sig & effect < 0, na.rm = TRUE),
-      .groups  = "drop"
-    ) |>
-    mutate(
-      # net_sig: -1 = every pixel is significant & negative, +1 = every pixel is
-      # significant & positive, 0 = no signal either way. This is what actually lets
-      # you see whether a hot cell is "successful" or "anti-successful."
-      net_sig     = prop_pos - prop_neg,
-      enough_data = n_pix >= min_n
-    )
-  
-  fill_var  <- if (metric == "net") "net_sig" else "prop_sig"
-  fill_lims <- if (metric == "net") c(-1, 1) else c(0, 1)
-  fill_lab  <- if (metric == "net") {
-    "Net direction of\nsignificant pixels\n(+ = positive, \u2212 = negative)"
-  } else {
-    "Proportion\nsignificant\nDART pixels"
-  }
-  
-  p0 <- fdf |>
-    ggplot(aes(x = year_diff, y = tx_coarse, fill = .data[[fill_var]], alpha = enough_data)) +
-    geom_tile(color = fc$col$separator, linewidth = fc$line$separator)
-  
-  if (metric == "net") {
-    p0 <- p0 + scale_fill_gradient2(
-      low = fc$col$neg, mid = fc$col$mid, high = fc$col$pos, midpoint = 0,
-      limits = fill_lims, name = fill_lab
-    )
-  } else {
-    p0 <- p0 + scale_fill_viridis_c(option = "magma", limits = fill_lims, name = fill_lab)
-  }
-  
-  if (show_n) {
-    p0 <- p0 + geom_text(aes(label = n_pix), size = fc$size$label_tile, color = fc$col$overall, alpha = 1)
-  }
-  
-  p0 <- p0 +
-    # tiles built on fewer than `min_n` pixels are faded, so a striking color isn't
-    # mistaken for a reliable signal when it's actually driven by a handful of pixels
-    scale_alpha_manual(values = c(`TRUE` = 1, `FALSE` = fc$alpha$faded), guide = "none") +
-    # break long multi-treatment names (e.g. "seeding;soil disturbance") onto separate
-    # lines instead of letting them run together or get truncated
-    scale_y_discrete(labels = function(x) gsub(';', ';\n', x)) +
-    labs(
-      x = "Years since treatment", y = "Treatment",
-      title = paste0(
-        "Where are treated areas significantly ",
-        if (metric == "net") "shifting" else "increasing", " ", ftype, "?"
-      ),
-      subtitle = paste0(
-        "(when objective was ", obj, ") \u2014 faded tiles have fewer than ", min_n, " pixels"
-      )
-    ) +
-    fc$theme$base +
-    theme(
-      axis.text = element_text(color = fc$col$text, size = fc$size$axis_text_small),
-      strip.text = element_text(color = fc$col$text)
-    )
-  
-  if (ptype == 1) {
-    p0 <- p0 + facet_wrap(~ us_l4name)
-  } else {
-    p0 <- p0 + coord_fixed()
-  }
   
   return(p0)
   

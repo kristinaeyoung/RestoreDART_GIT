@@ -70,7 +70,7 @@ section. Chunk labels are stable under editing in a way line numbers are not.~~
 *Superseded, September 2026. The template architecture is gone: `knit_expand()` /
 `knit_child()` were dropped, the five per-objective sections were written out in full
 into `2_sample_size_checks.Rmd`, the bulky per-ecoregion panels moved to
-`2_raw_result_graphs.Rmd`, and all shared computation moved into `0_DART_setup.R`, which
+`2_raw_result_graphs.Rmd`, and all shared computation moved into `2_results_setup.R`, which
 both documents source. Notes below still cite file plus chunk label, which remains the
 right convention, but two things in those citations are stale and have not been
 rewritten: any note naming `_objective_block.Rmd` now means the corresponding section of
@@ -151,7 +151,7 @@ should be restated wherever those results are presented.
   rows in the current draft). The dependency question - `writexl` or `openxlsx` - is moot
   and neither was added. The notes below remain as the record of what the mapping was.*
   *Partly addressed, and now one manual step from done. The table is built per objective
-  by the loop in `0_DART_setup.R` (it was chunk `results-X_23` of the retired
+  by the loop in `2_results_setup.R` (it was chunk `results-X_23` of the retired
   `_objective_block.Rmd`), with the requested column set -
   objective and treatment share columns, ecoregion, pixel and polygon counts, and
   intended/unintended significant-pixel counts and percentages - stacked across all five
@@ -204,7 +204,7 @@ should be restated wherever those results are presented.
   the parent. The models want the first pattern, not the second.*
 
   *30 September, and this is the thing to know before picking the item up again: there is
-  no model code in `claude_visible` to split. `0_DART_setup.R`, `helper_functions.R`,
+  no model code in `claude_visible` to split. `2_results_setup.R`, `helper_functions.R`,
   `plot_functions.R` and the three `.Rmd` files contain no model fitting and no
   diagnostics - no `lm()`, `glm()`, `lme4`, `glmmTMB` or residual code anywhere - because
   the mixed models run upstream and `1_combined_filter_input_data_06192026.csv` is their
@@ -460,7 +460,7 @@ that timing given the available sample.
   dense panel grid per objective, and the bar panels below it carry the same information
   on axes that can be read off directly. That reasoning is written into the report at the
   point of removal, per the project's convention that a removed analysis is explained
-  rather than deleted silently, and `plot_all_DART_sig()` remains in `plot_functions.R`
+  rather than deleted silently, and `plot_all_DART_sig()` was moved to `archive/retired_functions.R` on 07 October 2026
   so the figure can be restored by putting back a single call.*
 
   *The "is this just a boring boxplot" question is still unanswered for the per-ecoregion

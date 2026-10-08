@@ -370,9 +370,10 @@ objective’s own results and interpretation - are in
 sample-size decisions are made and documented. The bulky per-ecoregion
 reference panels are in <code>2_raw_result_graphs.Rmd</code>.</li>
 <li>Nothing in this document computes what it displays, and nothing here
-sets a threshold. <code>0_DART_setup.R</code> does both, for all three
-documents at once, so a threshold change takes effect everywhere and no
-two documents can report different numbers for the same quantity.</li>
+sets a threshold. <code>2_results_setup.R</code> does both, for all
+three documents at once, so a threshold change takes effect everywhere
+and no two documents can report different numbers for the same
+quantity.</li>
 <li>Every compiled table below is therefore built on post-filter data,
 and on <em>unequally</em> filtered data, since the thresholds differ by
 objective. The filtering log is the first thing compiled for that
@@ -845,34 +846,6 @@ x cover) response:</p>
 <td align="right">0.93</td>
 </tr>
 <tr class="even">
-<td align="left">increase_pfg</td>
-<td align="left">PFG</td>
-<td align="right">539</td>
-<td align="right">31.00</td>
-<td align="right">28.05</td>
-<td align="right">1.21</td>
-<td align="right">28.02</td>
-<td align="right">29.21</td>
-<td align="right">1.26</td>
-<td align="right">2.98</td>
-<td align="right">5.82</td>
-<td align="right">0.25</td>
-</tr>
-<tr class="odd">
-<td align="left">increase_shr</td>
-<td align="left">SHR</td>
-<td align="right">386</td>
-<td align="right">28.45</td>
-<td align="right">24.74</td>
-<td align="right">1.26</td>
-<td align="right">17.00</td>
-<td align="right">22.68</td>
-<td align="right">1.15</td>
-<td align="right">11.45</td>
-<td align="right">19.66</td>
-<td align="right">1.00</td>
-</tr>
-<tr class="even">
 <td align="left">decrease_shr</td>
 <td align="left">SHR</td>
 <td align="right">61</td>
@@ -899,6 +872,34 @@ x cover) response:</p>
 <td align="right">39.08</td>
 <td align="right">32.76</td>
 <td align="right">1.54</td>
+</tr>
+<tr class="even">
+<td align="left">increase_pfg</td>
+<td align="left">PFG</td>
+<td align="right">539</td>
+<td align="right">31.00</td>
+<td align="right">28.05</td>
+<td align="right">1.21</td>
+<td align="right">28.02</td>
+<td align="right">29.21</td>
+<td align="right">1.26</td>
+<td align="right">2.98</td>
+<td align="right">5.82</td>
+<td align="right">0.25</td>
+</tr>
+<tr class="odd">
+<td align="left">increase_shr</td>
+<td align="left">SHR</td>
+<td align="right">386</td>
+<td align="right">28.45</td>
+<td align="right">24.74</td>
+<td align="right">1.26</td>
+<td align="right">17.00</td>
+<td align="right">22.68</td>
+<td align="right">1.15</td>
+<td align="right">11.45</td>
+<td align="right">19.66</td>
+<td align="right">1.00</td>
 </tr>
 </tbody>
 </table>
@@ -6528,9 +6529,9 @@ removal</td>
 <div id="tables-written-to-.csv" class="section level4">
 <h4>Tables written to .csv</h4>
 <table>
-<caption>Compiled tables written to <code>../../results</code>. A table
-that came back empty is skipped rather than written as an empty
-file.</caption>
+<caption>Compiled tables written to
+<code>../analysis_inputs/results</code>. A table that came back empty is
+skipped rather than written as an empty file.</caption>
 <colgroup>
 <col width="32%" />
 <col width="53%" />
