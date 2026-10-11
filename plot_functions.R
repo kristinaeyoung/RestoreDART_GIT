@@ -35,6 +35,8 @@ fig_conventions <- function() {
     overall      = 'grey20',   # the undifferentiated 'overall' series
     neutral      = 'grey35',   # a single-series bar or histogram with no direction
     mid          = 'grey90',   # the zero point of the diverging heatmap fill
+    int          = '#1b7837',  # a significant INTENDED effect (see $int below)
+    uni          = '#762a83',  # a significant UNINTENDED effect
     text         = 'black',    # axis text and facet strip text
     label_inside = 'white',    # a label drawn inside a filled bar segment
     separator    = 'white',    # tile borders and bar outlines
@@ -63,6 +65,19 @@ fig_conventions <- function() {
 
   dir_lab <- c(pos = 'Significant positive', neg = 'Significant negative')
 
+  # The intended/unintended pair, added 10 Oct 2026 for the interpretation
+  # document's figures. It is a SECOND palette rather than a relabelling of
+  # `dir_lab`, because the two distinctions are not the same one: raw sign is a
+  # property of the effect, intent is that sign read against the objective's
+  # goal, and a decrease_* objective's intended effects are its negative ones.
+  # Reusing the red/blue pair for intent would make the same colour mean
+  # opposite raw signs in two panels of the same document.
+  #
+  # Green/purple is taken from PRGn, which is colourblind-safe and shares no hue
+  # with the RdBu pair above, so a reader can tell at a glance which of the two
+  # distinctions a figure is drawn on without reading the legend title.
+  int_lab <- c(int = 'Intended', uni = 'Unintended')
+
   th_base  <- theme_bw() + theme(axis.text = element_text(color = col$text))
   th_facet <- th_base +
     theme(strip.text = element_text(color = col$text, size = size$strip_text))
@@ -74,6 +89,11 @@ fig_conventions <- function() {
       lab    = dir_lab,
       levels = unname(dir_lab),
       pal    = setNames(c(col$pos, col$neg), unname(dir_lab))
+    ),
+    int  = list(
+      lab    = int_lab,
+      levels = unname(int_lab),
+      pal    = setNames(c(col$int, col$uni), unname(int_lab))
     ),
     line = list(
       zero      = 0.3,  # the y = 0 reference line
@@ -88,8 +108,10 @@ fig_conventions <- function() {
     lab = list(
       n_prefix   = 'n = ',  # sample sizes print as 'n = 1234', without parentheses
       dir_legend = 'Direction',
+      int_legend = 'Effect relative\nto objective',
       sig_legend = 'DART result\nsignificant?',
-      pct_sig_y  = '% of pixels with a significant effect'
+      pct_sig_y  = '% of pixels with a significant effect',
+      pct_int_y  = '% of pixels with a significant intended effect'
     ),
     theme = list(
       base         = th_base,
@@ -345,7 +367,7 @@ plot_model_resid <- function(
     x_lab = 'Fitted value', y_lab = 'Residual') {
   # Residuals against fitted values for one fitted mixed model, as a ggplot so
   # that the object can be saved alongside the .png and re-printed by
-  # 3_report_linear_models.Rmd without the model being refit.
+  # 3_report_lme4_models.Rmd without the model being refit.
   #
   # Takes a data frame with `fitted` and `resid` columns rather than the fitted
   # model, for two reasons: the caller is the one that knows how many points to
@@ -956,4 +978,384 @@ plot_all_DART_time <- function(
   
   return(p0)
   
+}
+
+plot_intended_dumbbell <- function(
+    int_effect_all, title = NULL, subtitle = NULL,
+    x_lab = '% of pixels with a significant effect',
+    y_lab = NULL, show_ratio = TRUE, show_n = TRUE
+) {
+  # The report's headline comparison on one axis: for each objective x cover
+  # response, the share of pixels carrying a significant INTENDED effect and the
+  # share carrying a significant UNINTENDED one, as two points joined by a line.
+  # Built on int_effect_all, i.e. collect_obj_tables('int_effect_'), whose
+  # intended and unintended columns are shares of all pixels and sum to the
+  # overall rate.
+  #
+  # Rows are ordered by the intended rate, so the figure reads top to bottom as
+  # a ranking, and the one objective whose unintended share EXCEEDS its intended
+  # share shows up as a reversed segment rather than as a number the reader has
+  # to compare. That reversal is the point of choosing a dumbbell over two sets
+  # of bars: the eye reads the direction of the segment before it reads either
+  # value.
+  #
+  # Sample size is printed in a text column on the right rather than encoded in
+  # point size. Point size would put a third visual variable on a figure whose
+  # whole argument is the horizontal distance between two points, and the pixel
+  # counts here span an order of magnitude, so the area difference would
+  # dominate the comparison it is meant to qualify.
+  #
+  # Intent, not raw sign, so the colours come from fig_conventions()$int rather
+  # than $dir. See the note there on why these are two palettes.
+
+  require(ggplot2)
+
+  req <- c('objective', 'cover', 'n_pix', 'pct_sig_int', 'pct_sig_und')
+  if (!all(req %in% colnames(int_effect_all))) {
+    stop('plot_intended_dumbbell(): int_effect_all is missing ',
+         paste(setdiff(req, colnames(int_effect_all)), collapse = ', '))
+  }
+
+  fc <- fig_conventions()
+
+  d0 <- int_effect_all
+  d0$obj_lab <- obj_cover_label(d0)
+  d0 <- d0[order(d0$pct_sig_int), ]
+  d0$obj_lab <- factor(d0$obj_lab, levels = d0$obj_lab)
+
+  # Guarded because an objective with no unintended pixels would give Inf, which
+  # prints as "Inf:1" and reads as a bug rather than as a ratio with an empty
+  # denominator.
+  d0$ratio_lab <- ifelse(d0$pct_sig_und > 0,
+                         paste0(sprintf('%.1f', d0$pct_sig_int / d0$pct_sig_und), ':1'),
+                         'n/a')
+  d0$n_lab <- paste0(fc$lab$n_prefix, format(d0$n_pix, big.mark = ',', trim = T))
+
+  lg <- rbind(
+    data.frame(obj_lab = d0$obj_lab, pct = d0$pct_sig_int,
+               intent = unname(fc$int$lab['int']), stringsAsFactors = F),
+    data.frame(obj_lab = d0$obj_lab, pct = d0$pct_sig_und,
+               intent = unname(fc$int$lab['uni']), stringsAsFactors = F)
+  )
+  lg$intent <- factor(lg$intent, levels = fc$int$levels)
+
+  # The two annotation columns sit to the right of the data at fixed fractions
+  # of the data range, so they stay clear of the longest segment whatever the
+  # magnitudes are, and the panel is expanded to make room for them.
+  x_max  <- max(c(d0$pct_sig_int, d0$pct_sig_und))
+  x_rat  <- x_max * 1.08
+  x_n    <- x_max * 1.30
+  x_edge <- x_max * 1.62
+
+  p0 <- ggplot() +
+    geom_segment(
+      data = d0,
+      aes(y = obj_lab, yend = obj_lab, x = pct_sig_und, xend = pct_sig_int),
+      linewidth = fc$line$annot, color = fc$col$text
+    ) +
+    geom_point(
+      data = lg,
+      aes(x = pct, y = obj_lab, color = intent),
+      size = fc$size$point_open
+    ) +
+    scale_color_manual(values = fc$int$pal, limits = fc$int$levels,
+                       drop = FALSE, name = fc$lab$int_legend)
+
+  if (show_ratio) {
+    p0 <- p0 +
+      geom_text(data = d0, aes(x = x_rat, y = obj_lab, label = ratio_lab),
+                size = fc$size$label_n, hjust = 0, color = fc$col$text)
+  }
+  if (show_n) {
+    p0 <- p0 +
+      geom_text(data = d0, aes(x = x_n, y = obj_lab, label = n_lab),
+                size = fc$size$label_n, hjust = 0, color = fc$col$text)
+  }
+
+  p0 <- p0 +
+    scale_x_continuous(limits = c(0, x_edge),
+                       expand = expansion(mult = c(0.01, 0.02))) +
+    labs(title = title, subtitle = subtitle, x = x_lab, y = y_lab) +
+    fc$theme$base
+
+  return(p0)
+
+}
+
+plot_tx_objective_heatmap <- function(
+    tx_tbl, title = NULL, subtitle = NULL,
+    x_lab = NULL, y_lab = 'Treatment combination',
+    fill_lab = '% intended', obj_levels = NULL, show_n = TRUE
+) {
+  # Treatment combination x objective, filled by the share of that cell's pixels
+  # carrying a significant intended effect. Takes the output of
+  # summarize_intended_by_group(summary_tbl_all, 'tx_coarse'), so the rates on
+  # the figure are the same ones the prose quotes.
+  #
+  # Rows are sorted by each treatment's mean rate across the objectives it
+  # appears in, not alphabetically, because the figure's argument is that the
+  # treatments sort - combinations involving seeding and mechanical removal
+  # cluster at one end and prescribed burn alone at the other. An alphabetical
+  # axis would hide exactly the pattern the figure exists to show.
+  #
+  # The grid is completed before plotting so that a treatment not used for an
+  # objective draws as an empty cell rather than as a gap the reader might
+  # mistake for a zero. Empty is `na.value`; zero is a filled cell at the bottom
+  # of the scale, and the two have to look different.
+  #
+  # The pixel count is printed under the rate rather than encoded as a dot size,
+  # because the counts here span four orders of magnitude and the reason to show
+  # them is to let a reader discount a high rate on a thin cell - which needs
+  # the number, not an area.
+  #
+  # Two geom_text layers with a FIXED vjust each, rather than one layer with a
+  # per-row vjust aesthetic, which ggplot2 applies unreliably.
+
+  require(ggplot2)
+
+  req <- c('objective', 'cover', 'tx_coarse', 'n_pix', 'pct_int')
+  if (!all(req %in% colnames(tx_tbl))) {
+    stop('plot_tx_objective_heatmap(): tx_tbl is missing ',
+         paste(setdiff(req, colnames(tx_tbl)), collapse = ', '))
+  }
+
+  fc <- fig_conventions()
+
+  d0 <- tx_tbl
+  d0$obj_lab <- obj_cover_label(d0)
+
+  g0 <- expand.grid(
+    tx_coarse = sort(unique(d0$tx_coarse)),
+    obj_lab   = unique(d0$obj_lab),
+    stringsAsFactors = FALSE
+  )
+  d1 <- merge(g0, d0[, c('tx_coarse', 'obj_lab', 'n_pix', 'pct_int')],
+              by = c('tx_coarse', 'obj_lab'), all.x = TRUE)
+
+  tx_mean <- tapply(d0$pct_int, d0$tx_coarse, mean)
+  d1$tx_coarse <- factor(d1$tx_coarse, levels = names(sort(tx_mean)))
+
+  if (is.null(obj_levels)) obj_levels <- unique(d0$obj_lab)
+  stopifnot(all(d1$obj_lab %in% obj_levels))
+  d1$obj_lab <- factor(d1$obj_lab, levels = obj_levels)
+
+  d1$pct_lab <- ifelse(is.na(d1$pct_int), '', sprintf('%.1f', d1$pct_int))
+  d1$n_lab   <- ifelse(is.na(d1$n_pix), '',
+                       paste0(fc$lab$n_prefix,
+                              format(d1$n_pix, big.mark = ',', trim = T)))
+
+  # White text on the dark end of the ramp, black on the light end. Mapped as an
+  # aesthetic with its own manual scale rather than computed into a colour
+  # column, so the cut point is visible here and moves with the fill scale.
+  d1$dark <- !is.na(d1$pct_int) & d1$pct_int > 0.55 * max(d0$pct_int)
+
+  v_pct <- if (show_n) -0.1 else 0.5
+
+  p0 <- ggplot(d1, aes(x = obj_lab, y = tx_coarse)) +
+    geom_tile(aes(fill = pct_int),
+              color = fc$col$separator, linewidth = fc$line$separator) +
+    geom_text(aes(label = pct_lab, color = dark),
+              size = fc$size$label_tile, vjust = v_pct)
+
+  if (show_n) {
+    p0 <- p0 +
+      geom_text(aes(label = n_lab, color = dark),
+                size = fc$size$label_tile, vjust = 1.3)
+  }
+
+  p0 <- p0 +
+    scale_fill_gradient(low = fc$col$mid, high = fc$col$int,
+                        na.value = fc$col$open_fill,
+                        name = fill_lab) +
+    scale_color_manual(values = c('TRUE' = fc$col$label_inside,
+                                  'FALSE' = fc$col$text),
+                       drop = FALSE, guide = 'none') +
+    labs(title = title, subtitle = subtitle, x = x_lab, y = y_lab) +
+    fc$theme$base +
+    theme(axis.text = element_text(size = fc$size$axis_text_small,
+                                   color = fc$col$text),
+          axis.text.x = element_text(angle = 45, hjust = 1))
+
+  return(p0)
+
+}
+
+plot_year_bin_lines <- function(
+    sig_by_bin_all, title = NULL, subtitle = NULL,
+    x_lab = 'Years since treatment',
+    y_lab = '% of pixels with a significant effect',
+    show_n = FALSE
+) {
+  # Intended and unintended significance rates across the four
+  # years-since-treatment bins, one panel per objective x cover response on a
+  # SHARED y axis. Built on sig_by_bin_all, i.e.
+  # collect_obj_tables('sig_by_bin_'), whose columns carry the raw sign.
+  #
+  # The raw-sign columns are resolved to intent here, per row, through
+  # intended_dir_word() - so a decrease_* panel's intended line is its negative
+  # rate and an increase_* panel's is its positive rate. This is the one place
+  # a compiled table is read as intent rather than as raw sign, and it is
+  # legitimate because the resolution happens within a row, against that row's
+  # own objective, rather than by pooling an intended column across objectives.
+  #
+  # A shared y axis is the whole point: the figure's claim is that every panel
+  # declines, and that in two of them the unintended line rises to meet the
+  # intended one. Free scales would make five unrelated panels.
+  #
+  # Sample size is off by default. Twenty labels over five panels crowds a
+  # figure whose message is the shape of two lines, and the bin counts are in
+  # the table this figure sits above.
+
+  require(ggplot2)
+
+  req <- c('objective', 'cover', 'year_bin', 'n_pix',
+           'mean_pct_sig_pos', 'mean_pct_sig_neg')
+  if (!all(req %in% colnames(sig_by_bin_all))) {
+    stop('plot_year_bin_lines(): sig_by_bin_all is missing ',
+         paste(setdiff(req, colnames(sig_by_bin_all)), collapse = ', '))
+  }
+
+  fc <- fig_conventions()
+
+  d0 <- sig_by_bin_all
+  pos_intended <- intended_dir_word(d0$objective) == 'positive'
+  d0$pct_int <- ifelse(pos_intended, d0$mean_pct_sig_pos, d0$mean_pct_sig_neg)
+  d0$pct_uni <- ifelse(pos_intended, d0$mean_pct_sig_neg, d0$mean_pct_sig_pos)
+  d0$obj_lab <- obj_cover_label(d0)
+
+  lg <- rbind(
+    data.frame(obj_lab = d0$obj_lab, year_bin = d0$year_bin, n_pix = d0$n_pix,
+               pct = d0$pct_int, intent = unname(fc$int$lab['int']),
+               stringsAsFactors = F),
+    data.frame(obj_lab = d0$obj_lab, year_bin = d0$year_bin, n_pix = d0$n_pix,
+               pct = d0$pct_uni, intent = unname(fc$int$lab['uni']),
+               stringsAsFactors = F)
+  )
+  lg$intent <- factor(lg$intent, levels = fc$int$levels)
+
+  # The bin order has to be recovered, not assumed. `year_bin` arrives as a
+  # factor with the right levels when the table comes from the setup script, but
+  # as plain character when it is read back from the written .csv - and the
+  # labels sort alphabetically to 1-5, 11-15, 16+, 6-10, which draws a line that
+  # rises at the end and inverts the figure's whole claim. Sorting on the
+  # leading integer of each label fixes both cases: a factor keeps its own
+  # levels, a character vector gets the numeric order.
+  yb <- as.character(d0$year_bin)
+  yb_lev <- if (is.factor(d0$year_bin)) levels(d0$year_bin) else {
+    u_0 <- unique(yb)
+    u_0[order(as.numeric(sub('[^0-9].*$', '', u_0)))]
+  }
+  stopifnot(all(yb %in% yb_lev))
+  lg$year_bin <- factor(as.character(lg$year_bin), levels = yb_lev)
+
+  p0 <- ggplot(lg, aes(x = year_bin, y = pct, color = intent, group = intent)) +
+    geom_line(linewidth = fc$line$series) +
+    geom_point(size = fc$size$point)
+
+  if (show_n) {
+    n_lab <- unique(lg[, c('obj_lab', 'year_bin', 'n_pix')])
+    n_lab$pct <- 0
+    p0 <- p0 +
+      geom_text(data = n_lab,
+                aes(x = year_bin, y = pct,
+                    label = format(n_pix, big.mark = ',', trim = T)),
+                inherit.aes = FALSE, size = fc$size$label_n,
+                vjust = 1.4, color = fc$col$text)
+  }
+
+  p0 <- p0 +
+    scale_color_manual(values = fc$int$pal, limits = fc$int$levels,
+                       drop = FALSE, name = fc$lab$int_legend) +
+    scale_y_continuous(expand = expansion(mult = c(0.10, 0.05))) +
+    facet_wrap(vars(obj_lab)) +
+    labs(title = title, subtitle = subtitle, x = x_lab, y = y_lab) +
+    fc$theme$facet_legend
+
+  return(p0)
+
+}
+
+plot_nontarget_fingerprint <- function(
+    nontarget_all, title = NULL, subtitle = NULL,
+    x_lab = 'Cover response',
+    y_lab = '% of pixels with a significant effect',
+    show_n = TRUE
+) {
+  # The community-response fingerprint: for each objective, what the NON-TARGET
+  # cover responses did in the same treated pixels, with the significant
+  # increasing share drawn above a zero line and the significant decreasing
+  # share below it. One panel per objective.
+  #
+  # Raw sign, not intent, and that is forced by the data rather than chosen: a
+  # non-target cover response has no assigned objective, so there is no goal
+  # against which its sign could be called intended. The fill therefore uses
+  # fig_conventions()$dir, the same red/blue every other raw-sign figure uses.
+  #
+  # The two shares are drawn on opposite sides of zero rather than stacked,
+  # because the question is whether a treatment pushed a non-target group up or
+  # down, and a stacked bar answers only how often it moved at all. The y axis
+  # is labelled with absolute values, since the sign is carried by the side of
+  # the line a bar sits on.
+  #
+  # Denominators here are the UNFILTERED post-treatment pixels for the
+  # objective, not the post-filter analysis set, so these percentages are not
+  # comparable with the compiled intended-effect rates. Say so in the caption
+  # wherever this figure appears.
+
+  require(ggplot2)
+
+  req <- c('objective', 'fun_group', 'n_pix', 'pct_sig_pos', 'pct_sig_neg')
+  if (!all(req %in% colnames(nontarget_all))) {
+    stop('plot_nontarget_fingerprint(): nontarget_all is missing ',
+         paste(setdiff(req, colnames(nontarget_all)), collapse = ', '))
+  }
+
+  fc <- fig_conventions()
+
+  d0 <- nontarget_all
+
+  lg <- rbind(
+    data.frame(objective = d0$objective, fun_group = d0$fun_group,
+               pct = d0$pct_sig_pos, direction = unname(fc$dir$lab['pos']),
+               stringsAsFactors = F),
+    data.frame(objective = d0$objective, fun_group = d0$fun_group,
+               pct = -d0$pct_sig_neg, direction = unname(fc$dir$lab['neg']),
+               stringsAsFactors = F)
+  )
+  lg$direction <- factor(lg$direction, levels = fc$dir$levels)
+
+  p0 <- ggplot(lg, aes(x = fun_group, y = pct, fill = direction)) +
+    geom_col(color = fc$col$separator, linewidth = fc$line$separator) +
+    geom_hline(yintercept = 0, linewidth = fc$line$zero, color = fc$col$text)
+
+  if (show_n) {
+    n_lab <- d0
+    n_lab$pct <- d0$pct_sig_pos
+    p0 <- p0 +
+      geom_text(data = n_lab,
+                aes(x = fun_group, y = pct,
+                    label = paste0(fc$lab$n_prefix,
+                                   format(n_pix, big.mark = ',', trim = T))),
+                inherit.aes = FALSE, size = fc$size$label_n,
+                vjust = -0.6, color = fc$col$text)
+  }
+
+  p0 <- p0 +
+    scale_fill_manual(values = fc$dir$pal, limits = fc$dir$levels,
+                      drop = FALSE, name = fc$lab$dir_legend) +
+    scale_y_continuous(labels = \(xx) abs(xx),
+                       expand = expansion(mult = c(0.08, 0.16))) +
+    # Free x, shared y. The usual rule for a compiled figure is a shared scale
+    # on both, but the x axis here is categorical and the categories genuinely
+    # differ by panel - each objective has its own set of non-target responses.
+    # A shared x axis draws an empty slot for every response the panel does not
+    # have, which reads as a response of zero rather than as a question not
+    # asked. The y axis, which is what the panels are being compared on, stays
+    # shared.
+    facet_wrap(vars(objective), scales = 'free_x') +
+    labs(title = title, subtitle = subtitle, x = x_lab, y = y_lab) +
+    fc$theme$facet_legend
+
+  return(p0)
+
 }

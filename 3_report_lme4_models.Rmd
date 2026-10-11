@@ -1,0 +1,394 @@
+---
+title: "RestoreDART pooled model results"
+author: "BEM"
+date: "October 2026"
+output: html_document
+---
+
+## Notes
+
+* This document reports the **pooled mixed models**: one model per objective x cover response, fit to the pixel-level DART effects that the three `2_*.Rmd` documents summarise descriptively. Those documents count and average significant pixels; this one asks what the effect was as a function of time since treatment, treatment type, climate, ecoregion and pre-treatment cover, with polygons and pixels as random groupings. Read `2_make_DART_results.Rmd` first: the sample these models are fit to is the one its filtering log describes.
+* Nothing here fits a model. `3_make_linear_models.R` does the fitting and writes a dated run directory of `.csv` tables, `.png` figures and one `.Rdata` of plot objects; this document loads that directory and displays it. A re-render costs seconds and cannot change a result.
+* **Which run is shown is a property of the directory, not of this document.** The run manifest is the first table below and records the pixels used, the sample-size thresholds in force and the package versions. Point the document at a different run by editing `run_dir` in the setup chunk.
+* The document runs in this order: the run's own settings and sample, then model selection, then what the selected models say - variance first, fixed effects second - then the fit diagnostics, and last the caveats. Diagnostics sit near the end because they qualify everything above them rather than belonging to any one section.
+
+```{r setup, message = F, warning = F, echo = F}
+# This document deliberately does NOT source 2_results_setup.R. That script reads
+# the 3.2 GB input file (~47 s) and rebuilds the report's compiled tables, none
+# of which this document shows - everything here comes out of a run directory
+# written by 3_make_linear_models.R. helper_functions.R is sourced on its own
+# because the prose below uses intended_dir_word(); it defines functions and
+# reads nothing.
+source('helper_functions.R', local = knitr::knit_global())
+
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+
+# Which run to display. `run_tag` picks between the two `sig_only` settings,
+# which can share a run directory; `run_dir` defaults to the most recent dated
+# directory so the document keeps rendering as runs accumulate. To pin the
+# report to one specific run - which is what to do before circulating it or
+# quoting it in the manuscript - uncomment the literal and set it.
+run_tag <- 'allpix'   # 'allpix' or 'sigonly'
+
+# Must stay equal to `out_root` in 2_results_setup.R. This document does not
+# source that script - it fits nothing and needs none of it - which is why the
+# path is repeated here rather than inherited, and why it has to be changed in
+# both places. Retired: '../claude_visible/results' (removed 07 Oct 2026) and
+# '../analysis_inputs/results' (08 Oct 2026, when outputs were separated from
+# inputs into ../analysis_outputs).
+run_root <- '../analysis_outputs'
+
+# The directory prefix changed on 10 Oct 2026 from 'RestoreDART_model_run_' to
+# 'RestoreDART_run_', when the model stage stopped writing a directory of its
+# own and began writing into the run directory the setup script defines. A run
+# is now one directory holding both stages; this document still reads only the
+# `3_DART_model_*` files out of it.
+# run_dir <- file.path(run_root, 'RestoreDART_run_10072026')
+run_dirs <- sort(list.files(run_root, pattern = '^RestoreDART_run_',
+                            full.names = TRUE))
+stopifnot(length(run_dirs) > 0)
+run_dir <- run_dirs[length(run_dirs)]
+
+# Read as one list rather than one assignment per table, so that a run directory
+# missing a table names the file it is missing instead of failing later on an
+# object that was never created. `ppd` is optional: 3_make_linear_models.R skips
+# the posterior predictive check, and writes no file, when `n_ppd` is 0.
+tbl_nms  <- c('manifest', 'sample', 'convergence', 'aic', 'lrt',
+              'sequential', 'coefs', 'variance')
+tbl_opt  <- c('ppd')
+fl_of    <- \(nm) file.path(run_dir, paste0('3_DART_model_', nm, '_', run_tag, '.csv'))
+stopifnot(all(file.exists(sapply(tbl_nms, fl_of))))
+
+mod_tbls <- lapply(setNames(tbl_nms, tbl_nms), \(nm) read.csv(fl_of(nm), stringsAsFactors = FALSE))
+for (nm in tbl_opt) {
+  mod_tbls[[nm]] <- if (file.exists(fl_of(nm))) read.csv(fl_of(nm), stringsAsFactors = FALSE) else NULL
+}
+
+# Brings in `mod_plots`, the named list of ggplot objects. Printed from loops
+# below, where ggplot objects do NOT auto-print and an explicit print() is
+# required - the opposite of the kable rule that applies everywhere else in this
+# project.
+plot_fl <- file.path(run_dir, paste0('3_model_plots_', run_tag, '.Rdata'))
+stopifnot(file.exists(plot_fl))
+load(plot_fl)
+
+# Convenience handles for the prose. The objective names are taken from the
+# sample table rather than from the plot list, so that an objective whose
+# figures failed to save is still reported as having been fit.
+mf_manifest <- mod_tbls$manifest
+mf_sample   <- mod_tbls$sample
+mf_conv     <- mod_tbls$convergence
+mf_aic      <- mod_tbls$aic
+mf_lrt      <- mod_tbls$lrt
+mf_seq      <- mod_tbls$sequential
+mf_coefs    <- mod_tbls$coefs
+mf_vc       <- mod_tbls$variance
+mf_ppd      <- mod_tbls$ppd
+obj_nms     <- unique(paste0(mf_sample$objective, '_', mf_sample$cover))
+
+# Two display-level flags, derived once here so that a section's prose, its
+# chunk's `eval` option and its table cannot disagree about the same condition.
+# This is the only computation the document does, and neither flag changes a
+# number - they decide what is shown and what is emphasised.
+
+# Gates the convergence section. When every fit converged cleanly with no
+# variance component on the boundary there is nothing for the table to list, and
+# an empty table plus two paragraphs explaining what it would have contained is
+# noise rather than evidence. The section collapses to its one-line count and
+# expands again by itself on any future run that is not clean.
+conv_any <- any(mf_conv$singular | mf_conv$n_warning > 0)
+
+# A fixed effect whose confidence interval excludes zero - `lo` and `hi` share a
+# sign. This is the whole of what the star and the bold row mean in the fixed
+# effects table below: an interval that does not span zero, at this run's
+# `ci_method`. It is NOT a p value, nothing was tested to produce it, and the
+# multiplicity caveat on the likelihood ratio tests applies here too.
+mf_coefs$excludes_zero <- sign(mf_coefs$lo) == sign(mf_coefs$hi)
+mf_coefs$sig_star      <- ifelse(mf_coefs$excludes_zero, '*', '')
+```
+
+## The run
+
+These results come from `` `r basename(run_dir)` ``, fit on `r mf_manifest$run_date` with `r mf_manifest$pixels_used`, covering `r mf_manifest$n_objectives` objective x cover response combinations.
+
+The distinction the `pixels_used` field records is the single most important thing to settle before reading anything below, because the two settings estimate different quantities rather than the same quantity two ways. Fitting **all post-filter pixels** estimates the average treatment effect across the treated landscape, counting the pixels where DART detected nothing as the near-zero estimates they are - this is what a reader assumes when a paper reports "the effect of seeding". Fitting **significant pixels only** estimates the average effect among detected effects, which is the quantity the three `2_*.Rmd` documents report throughout, and so is the setting whose magnitudes are comparable with them. A difference between the two runs is not a disagreement to be resolved.
+
+```{r run_manifest, echo = F}
+knitr::kable(
+  data.frame(Setting = names(mf_manifest), Value = unlist(mf_manifest, use.names = FALSE)),
+  caption = 'Run manifest: the settings under which these models were fit. `min_txeco_n` and `min_year_n` are the sample-size thresholds inherited from 2_results_setup.R, listed as the keyed vectors they are set as; `n_poly_sub` records whether the fit used every polygon or a subsample.'
+)
+```
+
+## The sample each model was fit to
+
+`n_pix_avail` is the objective's post-filter pixel count - after the sparse treatment x ecoregion cells, any depopulated levels and the late-year truncation, all at this run's thresholds. `n_row` is what reached `lmer()` after dropping rows with a missing covariate and, in a `sigonly` run, after the significance subset. The gap between them is worth reading: a covariate that is largely missing for one objective shows up here and nowhere else.
+
+```{r run_sample, echo = F}
+knitr::kable(
+  mf_sample,
+  col.names = c('Objective', 'Cover', 'Significant Only', 'Pixels Available',
+                'Rows Fit', '% Pixels Used', '# Polygons', '# Pixels',
+                '# Treatments', '# Ecoregions', '# Models'),
+  caption = 'Rows, polygons and factor levels entering each objective\'s models. `# Models` is the number of rungs of the ladder that were estimable for that objective: a specification is skipped when the factor it adds has fewer than two surviving levels.',
+  digits = 2
+)
+```
+
+## Model comparison
+
+Seven nested specifications per objective, fit by maximum likelihood (`REML = FALSE`, which is what makes likelihoods comparable across different fixed-effect structures). `m0` has no fixed effects and exists to partition the variance; each later rung adds one term - time since treatment, treatment type, aridity, SPEI, ecoregion, pre-treatment cover - in the order of KY's original ladder.
+
+The seven rungs, in the order they are fit:
+
+```{r run_forms, echo = F}
+knitr::kable(
+  unique(mf_aic[, c('model', 'form')]),
+  format = 'html',
+  col.names = c('Model', 'Formula'),
+  caption = 'The seven rungs of the ladder. `(1 | polygon/pixel)` is a random intercept for polygon and a second for pixel nested within polygon.'
+)
+```
+
+**What AIC measures.** Adding a covariate to a model can never make it fit worse, so "which model fits best" is not a question that can be answered by fit alone — the largest model always wins. AIC (the Akaike Information Criterion) scores a model on how well it fits *minus* a penalty for how many parameters it spent getting there. **Lower is better**, and the units are arbitrary: an AIC of 610,394 means nothing on its own, and only differences between models fit to the same rows can be read. That is what `delta AIC` is — each model's distance above the best model in its own objective — so the selected model is the row where `delta AIC` is 0 and a model 50 AIC units above it is decisively worse. The conventional reading is that a gap under about 2 is no evidence either way, and a gap over about 10 is strong.
+
+**`delta_aic` is within an objective, not across objectives.** Each objective's models are fit to a different number of rows, so an AIC from `decrease_tre` and one from `increase_pfg` are not on the same scale. Two further cautions: the ladder is strictly nested, so AIC rewards the larger model whenever the added covariate does anything at all, and a `delta_aic` of one or two between adjacent rungs is not a reason to prefer either.
+
+```{r run_aic, echo = F}
+knitr::kable(
+  mf_aic[, c('objective', 'cover', 'model', 'n_row', 'df', 'logLik', 'AIC', 'delta_aic')],
+  format = 'html',
+  col.names = c('Objective', 'Cover', 'Model', 'Rows Fit', 'df',
+                'log-Likelihood', 'AIC', 'delta AIC'),
+  caption = 'Model comparison within each objective. The selected model in every section below is the lowest-AIC rung, i.e. the row where delta AIC is 0. Rules separate objectives; AIC values are comparable within a block and not between blocks.',
+  digits = 2
+) |>
+  style_kable_rows(group = mf_aic$objective)
+```
+
+### Likelihood ratio tests
+
+AIC ranks the rungs; this tests them. lme4 reports no p values on its fixed effects by design — the null distributions of those statistics are not t or F distributed at finite sample size, and the usual degrees-of-freedom corrections are approximations with no exact justification. The package's own recommendation, when an inferential statement is needed, is to frame it as a likelihood ratio test by comparing nested models, which is what the ladder supports and what the table below reports. No refitting was involved: every rung was fit by maximum likelihood precisely so these likelihoods are comparable.
+
+**What a likelihood ratio test measures.** The likelihood is how probable the observed data is under a fitted model, and `Deviance` is a rescaling of it where **lower means a better fit**. A larger model always has the lower deviance; the question is whether it is lower by *more than adding a free parameter would buy anyway*. `Chi-squared` is exactly that gap — twice the drop in deviance from the rung below — and the test compares it against how large the gap would typically be if the added term did nothing. So **a high chi-squared means the added term bought a real improvement**, and the `p` column puts a number on how unusual a gap that size would be under the hypothesis that it bought nothing. Small `p` is evidence the term belongs; large `p` says the ladder could stop at the rung below.
+
+This asks the same question as `delta AIC` and answers it in a different currency. AIC is a ranking with a fixed penalty per parameter; the likelihood ratio test is a hypothesis test with a p value. They usually agree, and where they disagree it is because AIC's penalty is not calibrated to any particular error rate.
+
+**Which models to use for inference.** Read inferential statements from this table, not from the coefficient table. The fixed effects below carry a `t Value` but no p value, deliberately, and these nested comparisons are where lme4's own documentation directs an inferential claim. Two things qualify that. Each row compares one rung against the rung below it, so these are a sequence of nested comparisons rather than independent tests, and nothing here corrects for the several comparisons made within an objective. And the model being described in every later section was chosen by AIC *on this same data*, so a test of a term that drove the selection is optimistic — the honest use of the selected model is description, with the ladder rather than the coefficient the thing an inferential claim rests on. A term that improves the likelihood significantly at `r format(max(mf_aic$n_row), big.mark = ',')` rows can still be far too small to matter.
+
+```{r run_lrt, echo = F}
+knitr::kable(
+  mf_lrt,
+  format = 'html',
+  col.names = c('Objective', 'Cover', 'Model', 'npar', 'Deviance',
+                'Chi-squared', 'df', 'p'),
+  caption = 'Likelihood ratio tests along each objective\'s ladder. Each row compares that rung against the one above it in the table; the first rung of each objective has no comparison and so no test statistic. Rules separate objectives.',
+  digits = 3
+) |>
+  style_kable_rows(group = mf_lrt$objective)
+```
+
+*Reference.* Bates, Mächler, Bolker & Walker (2015), "Fitting Linear Mixed-Effects Models Using lme4", *Journal of Statistical Software* **67**(1). Section 5.2.5, **p. 35, para. 4**, for the recommendation to frame the inference problem as a likelihood ratio test by supplying several fitted models to `anova()`; **p. 35, para. 2** for why no p values are attached to the fixed effects — the null distributions are not t distributed at finite sample size, nor are the corresponding distributions of differences in scaled deviances F distributed, so the degrees-of-freedom approximations are "at best ad hoc solutions" (Satterthwaite 1946; Kenward and Roger 1997). Section 5.2.4, **p. 35, para. 1**, for the chi-squared statistic as the difference in deviance between successive models.
+
+### Convergence and singular fits
+
+This run has `r sum(mf_conv$singular)` singular fit`r if (sum(mf_conv$singular) == 1) '' else 's'` and `r sum(mf_conv$n_warning > 0)` fit`r if (sum(mf_conv$n_warning > 0) == 1) '' else 's'` carrying a convergence warning, out of `r nrow(mf_conv)` fitted models.
+
+```{r run_conv_text, echo = F}
+# What the two conditions mean is only worth a reader's attention when there is
+# something to explain, so the explanation and the table below are both gated on
+# `conv_any` (set in the setup chunk, so that this text, the table's `eval`
+# option and the count above cannot disagree). On a clean run this section is
+# the single line above; it expands by itself on any future run that is not.
+#
+# Built as a character vector and emitted by the inline expression below rather
+# than written as markdown, which is this project's pattern for prose that is
+# conditional or generated. paste() on an empty vector returns "", so nothing is
+# rendered when there is nothing to say.
+conv_text <- if (!conv_any) character(0) else c(
+  "These are two different things, which mean different things. A **singular** fit is one where some variance component is estimated as exactly zero - the fit sits on the boundary of the parameter space. lme4 is deliberately built to represent that rather than fail on it, so a singular fit is a statement about the data, not a numerical problem: it usually means the grouping factor it names explains no variance once the others are in. With a pixel random intercept on data where many pixels are observed in only one or two years, a singular pixel term is a real possibility.",
+  "A **convergence warning** is the optimizer's own complaint and deserves more attention, because the usual cause has already been ruled out: the package's authors report seeing the underlying algorithm fail mainly on badly scaled predictors, and the three continuous covariates here were centred and scaled before fitting for exactly that reason."
+)
+```
+
+`r paste(conv_text, collapse = '\n\n')`
+
+```{r run_conv, echo = F, eval = conv_any}
+knitr::kable(
+  mf_conv[mf_conv$singular | mf_conv$n_warning > 0,
+          c('objective', 'cover', 'model', 'singular', 'n_warning', 'optimizer', 'message')],
+  format = 'html',
+  col.names = c('Objective', 'Cover', 'Model', 'Singular', '# Warnings', 'Optimizer', 'Message'),
+  caption = 'Every fit that is singular or carries a convergence warning. This table is rendered only when there is at least one of either.',
+  row.names = FALSE
+) |>
+  style_kable_rows(group = mf_conv$objective[mf_conv$singular | mf_conv$n_warning > 0])
+```
+
+*Reference.* Bates et al. (2015), section 4. **P. 25, para. 3** for the decision to parameterise the variance-covariance matrix in a constrained space "in order to allow for singular fits", and for the authors' point that singular fits are common in practice so being able to fit one is an advantage — the alternative, fitting on a transformed unconstrained scale, "will often give rise to convergence warnings" instead (Bolker et al. 2013). **P. 25, para. 2** for the observation that the only PLS failures the authors had observed arise "with badly scaled problems", which is why the three continuous covariates here are centred and scaled; **p. 25, para. 5** repeats it as the difficulty users most often hit.
+
+### Sequential decomposition of the selected model
+
+Sums of squares and F statistics for the fixed-effects terms of each objective's selected model, in the order they enter the formula. **This is an informal reading, not a test.** There are no p values attached because there is no agreed way to obtain denominator degrees of freedom for these statistics — which is the same reason the coefficient table carries no p values. What the table supports is a comparison of relative magnitude: which terms account for much of what the model explains, and which for almost none.
+
+Sequential means order-dependent. Each term is adjusted for the terms before it and not for those after, so `year_diff` — first in every formula — carries any variation it shares with the covariates that follow it.
+
+```{r run_seq, echo = F}
+knitr::kable(
+  mf_seq,
+  format = 'html',
+  col.names = c('Objective', 'Cover', 'Model', 'Term', 'npar',
+                'Sum Sq', 'Mean Sq', 'F'),
+  caption = 'Sequential (Type I) decomposition of each selected model\'s fixed effects. F statistics are reported without p values, deliberately. Rules separate objectives.',
+  digits = 3
+) |>
+  style_kable_rows(group = mf_seq$objective)
+```
+
+The formulas behind those labels are at the top of this section.
+
+*Reference.* Bates et al. (2015), section 5.2.4. **P. 34, para. 1** for `anova()` on a single fitted model returning F statistics for the sequential decomposition of the fixed-effects terms, and **p. 34, para. 2** for the reading this section takes from it: the relative magnitudes of the sums of squares say which terms explain much and which little, but "this is only an informal assessment of significance as there are no p values associated with these F statistics".
+
+## Variance partition
+
+Before any fixed effect is interpreted, this is where the variation in the pixel-level DART effect actually sits: between polygons, between pixels within a polygon, or within a pixel across years. It is the quantitative form of the report's standing caveat that pixels inside a polygon are not independent replicates - a polygon term that takes most of the variance means the effective sample size is closer to the `r format(sum(mf_sample$n_poly), big.mark = ',')` polygons than to the `r format(sum(mf_sample$n_pixel), big.mark = ',')` pixels.
+
+```{r run_varcomp_fig, echo = F, fig.width = 8, fig.height = 5.5, fig.align = 'center'}
+mod_plots[['varcomp_all']]
+```
+
+**Figure.** Percent of total variance in the pixel-level DART effect (y axis) by objective x cover response (x axis), with fill giving the variance component - the polygon random intercept, the pixel-within-polygon random intercept, and the residual. Bars sum to 100% within each objective. Printed labels are omitted from segments below 6% of the bar, which cannot hold readable text. Each bar comes from that objective's own selected model, so the models behind two bars may carry different fixed effects.
+
+The table repeats the figure's percentages and adds what the figure cannot carry: the variance and standard deviation in the response's own units. The figure answers where the variation sits *proportionally*, which is the question the caveat above is about; the table is what to quote a number from, and the SD column is the one to quote, being in the units of the cover effect rather than their square. They are kept together for that reason rather than as alternatives.
+
+```{r run_varcomp_tbl, echo = F}
+knitr::kable(
+  mf_vc,
+  format = 'html',
+  col.names = c('Objective', 'Cover', 'Model', 'Component', 'Variance', 'SD', '% of Variance'),
+  caption = 'Variance components of each objective\'s selected model. `Variance` is in the squared units of the response and `SD` in its own units; `% of Variance` is the quantity the figure above plots. These are maximum-likelihood estimates: refit the selected model with REML = TRUE before quoting a variance component on its own. Rules separate objectives.',
+  digits = 3
+) |>
+  style_kable_rows(group = mf_vc$objective)
+```
+
+*Reference.* Bates et al. (2015), section 3.4, **p. 16**, for the REML criterion itself, obtained by integrating the marginal density of the response with respect to the fixed effects (Laird and Ware 1982). The reason the refit caveat above is necessary is at **p. 35, para. 1**: `anova()` refits a REML fit with maximum likelihood by default because that "is necessary in order to get sensible answers when comparing models that differ in their fixed effects" — which is the same reason every rung of this ladder was fit with `REML = FALSE`, and therefore the reason a variance component quoted from one of them should be re-estimated under REML first.
+
+## Fixed effects
+
+Estimates are in the response's own units - the differenced RAP cover effect - except for `aridity`, `spei` and `mean_cover_5YBT`, which were centred and scaled, so their coefficients are the change per standard deviation. `year_diff` was left in years, so its coefficient reads directly as change per year since treatment.
+
+Treatment and ecoregion terms are contrasts against whichever level sorted first, not effects of that level in isolation — so a treatment coefficient is the difference from that reference treatment, and the reference itself is in the intercept.
+
+A faceted point-range figure of these estimates used to sit here and has been removed: with up to `r max(table(mf_coefs$objective))` terms on one objective, most of them ecoregion and treatment contrasts, it was a dense five-panel grid that took longer to decode than the table it duplicated. `3_make_linear_models.R` still builds it and still saves it as `3_model_coefs_all_<tag>.png` in the run directory, so it can be looked at on its own; `plot_model_coefs()` is unchanged and nothing else about the run has changed.
+
+Intervals are the model's own, computed by the **`r mf_manifest$ci_method`** method. lme4 offers three — the Wald quadratic approximation, likelihood profiling, and a parametric bootstrap — and on the package authors' own worked example the three agreed closely, the largest discrepancy being about a quarter of the interval width and falling on a random-effect correlation rather than a fixed effect. Wald is the only one affordable at this sample size: profiling and bootstrapping both refit the model many times over hundreds of thousands of rows. It is worth running `profile` once on the smallest objective to confirm the Wald intervals reported here are trustworthy, since the Wald approximation is exactly the one that degrades when a likelihood profile is non-linear.
+
+**Rows whose interval excludes zero are bold and carry a star.** That is all the star means: `CI Lower` and `CI Upper` are on the same side of zero, so zero is not among the values the interval covers. It is not a p value, nothing was tested to produce it, and the multiplicity caveat on the likelihood ratio tests applies here with more force — there are `r nrow(mf_coefs)` rows in this table, so some intervals would exclude zero by chance alone even if every term were inert. Read it as a reading aid for finding the terms worth attention, and take the inferential claim from the likelihood ratio tests.
+
+```{r run_coefs_tbl, echo = F}
+knitr::kable(
+  mf_coefs[, c('objective', 'cover', 'model', 'term', 'estimate', 'se', 'lo', 'hi',
+               'ci_method', 't_value', 'intended_sign', 'sig_star')],
+  format = 'html',
+  col.names = c('Objective', 'Cover', 'Model', 'Term', 'Estimate', 'SE',
+                'CI Lower', 'CI Upper', 'CI Method', 't Value', 'Intended Sign',
+                'Excludes 0'),
+  caption = 'Fixed effects of each objective\'s selected model. A starred, bold row is one whose confidence interval excludes zero - see the paragraph above for what that does and does not mean. `Intended Sign` is -1 where the management goal was a decrease in cover and +1 where it was an increase, from get_intended_sign(); it is the objective\'s goal, not a property of the term. `t Value` is carried as a magnitude, not a test statistic - no p values are reported here, and the likelihood ratio tests above are where an inferential statement should be read from instead. Rules separate objectives.',
+  digits = 4
+) |>
+  style_kable_rows(group = mf_coefs$objective, bold = mf_coefs$excludes_zero)
+```
+
+*Reference.* Bates et al. (2015), section 5.2.6, **p. 35, para. 6**, for the three `confint()` methods — Wald approximations, available for fixed-effect parameters only, likelihood profiling, and parametric bootstrapping. The worked comparison the paragraph above summarises is at **p. 36, para. 1**: on the paper's own example all three agreed closely, the largest discrepancy being a 26% difference in interval width between the profile and bootstrap methods, and falling on a random-effect correlation rather than on a fixed effect. Section 5.2.7, **p. 36**, is also worth noting here — it is the profile zeta plot, and linearity of that plot for a parameter is what would confirm the Wald approximation is reasonable for it.
+
+For orientation while reading that table, each objective's goal in words:
+
+```{r run_intended, echo = F}
+knitr::kable(
+  data.frame(
+    Objective = mf_sample$objective,
+    Cover     = mf_sample$cover,
+    Intended  = sapply(mf_sample$objective, intended_dir_word),
+    row.names = NULL
+  ),
+  caption = 'The raw sign of the cover effect each objective was aiming for, from intended_dir_word().'
+)
+```
+
+## Posterior predictive check
+
+A different question from the residual plots: rather than asking whether the errors look as assumed, this asks whether data simulated *from the fitted model* looks like the data that was observed. Each selected model was used to simulate `r if (is.null(mf_ppd)) 0 else max(mf_ppd$n_sim)` datasets; a summary statistic was computed on each, and the observed statistic located in that distribution.
+
+Two statistics, because they fail differently. The **IQR** is the spread of the bulk of the distribution. The **SD** is dominated by the tails. A model that reproduces the IQR but badly under-predicts the SD is getting the typical pixel right and the extreme ones wrong — which is the failure to expect here, since the response is itself an estimate whose own error grows where cover is low.
+
+`p` is one-tailed and counts the observed value into its own reference distribution, so it can never be exactly 0 or 1. Values near 0.5 are unremarkable; values near either end are the signal. One caveat carried over from the method itself: unlike a full Bayesian check this conditions on the fitted parameters and ignores their uncertainty, which is a reasonable approximation when the residual variation is large — as it is here.
+
+```{r run_ppd, echo = F}
+if (is.null(mf_ppd)) {
+  cat('Not run: `n_ppd` was 0 for this run.')
+} else {
+  knitr::kable(
+    mf_ppd,
+    format = 'html',
+    col.names = c('Objective', 'Cover', 'Model', 'Statistic', 'Observed',
+                  'Simulated Mean', 'Sim. 2.5%', 'Sim. 97.5%', '# Simulations', 'p'),
+    caption = 'Posterior predictive check on each objective\'s selected model. `Observed` is the statistic computed on the fitted response; the three simulated columns summarise the same statistic across simulated datasets. Rules separate objectives.',
+    digits = 4
+  ) |>
+    style_kable_rows(group = mf_ppd$objective)
+}
+```
+
+*Reference.* Bates et al. (2015), section 5.2.3, **p. 33, para. 5**, for posterior predictive simulation as a diagnostic — pick a summary statistic, compute it over an ensemble of simulations, and see where the observed value falls (Gelman and Hill 2006). The paper's worked example uses the interquartile range, which is one of the two statistics reported here. **P. 33, para. 6** is the source of both the one-tailed p value construction, which counts the observed value into its own reference distribution, and the caveat that unlike a full Bayesian check this "does not allow for the uncertainty in the estimated parameters" but "should be a reasonable approximation when the residual variation is large". The `simulate()` method itself is section 5.2.8, **p. 36**.
+
+## Fit diagnostics
+
+Four figures per objective, all from its selected model. The first three are drawn on one common subsample of residuals, so they cannot disagree about which residuals they show.
+
+**Residual against fitted** is the general-purpose plot. **Scale-location** — the square root of the absolute residual against the fitted value, with a loess trend — is where heteroscedasticity shows most directly, and that is the assumption most at risk: a pixel-level DART effect is an estimate with its own standard error, and that error is not constant across the range of cover the pixels span. A trend that rises with the fitted value says the model's single residual variance is describing two different things. The **residual Q-Q** is where heavy tails show, and heavy tails are what would make every interval in the table above optimistic.
+
+The fourth asks a question the other three cannot. **The random-effect Q-Q** plots the conditional modes of the polygon and pixel intercepts. The residual plots test the within-pixel errors; this tests whether the polygon and pixel intercepts are themselves normal, which is a separate assumption the model makes and one nothing else in this project looks at.
+
+**Nothing here is tested.** These are drawn for inspection; no result in this document is conditioned on them and no assumption has been assessed. In a `sigonly` run the residuals are bimodal by construction, because the sample is selected on the outcome and its two tails are selected in opposite directions — that is an expected feature of that run, not a fixable misfit.
+
+```{r run_diagnostics, echo = F, fig.width = 10, fig.height = 4.5, fig.align = 'center'}
+# print() is required: ggplot objects do not auto-print from inside a loop. This
+# is the one place in this project where printing a plotting object is correct -
+# the kable rule (never wrap in print()) is unrelated and still holds above.
+for (nm in obj_nms) {
+  for (pre in c('resid_', 'scaleloc_', 'qq_', 'ranefqq_')) {
+    key <- paste0(pre, nm)
+    if (!is.null(mod_plots[[key]])) print(mod_plots[[key]])
+  }
+}
+```
+
+*Reference.* Bates et al. (2015), section 5.2.3. **P. 33, para. 2** for the three residual-level plots — fitted versus residual, scale-location, and quantile-quantile — modelled on the diagnostic graphics of `nlme`. **P. 33, para. 3** carries a detail worth knowing when reading the panels above: lme4's scale-location and Q-Q plots are built on **raw** rather than standardised residuals, unlike `plot.lm`. **P. 33, para. 4** is the fourth panel's justification — the residual plots examine linearity, homoscedasticity and normality at the level of the residuals, and `qqmath()` on the conditional modes is the separate check for normality of the random effects themselves.
+
+**Figure.** For each objective in turn, four panels: residual against fitted value; scale-location, the square root of the absolute residual against the fitted value with a loess trend in red; the normal Q-Q plot of those same residuals; and the normal Q-Q plot of the random-effect conditional modes, facetted by grouping factor. Every panel title names the objective x cover response, and the subtitle names the selected model and how many points are drawn out of how many rows were fit — the figures are subsampled because a saved plot object carries its own data, and plotting every residual would make the `.Rdata` slower to load than the models are to refit. Dashed lines are zero in the first panel and the first-and-third-quartile reference line in both Q-Q panels.
+
+## Caveats
+
+The two standing caveats from the results report apply unchanged, because these models are fit to the same rows:
+
+* Objective groupings are **not a partition** - a pixel counts toward an objective if it fell in any part of that objective, so multi-objective treatments appear in several groupings and parts of the dataset are counted more than once.
+* An objective/response pairing is only included when the response cover type matches the objective's target cover, with **bare ground the sole exception** (shown against all objectives).
+
+Five more belong to this stage specifically:
+
+* **The models are unweighted.** The DART stage gives every pixel a confidence interval, and `1 / (upper - lower)` would be the obvious precision weight, but BEM settled on no weighting after the simulation in `weight_testing_summary.Rmd` and that decision is carried forward here rather than reopened.
+* **The five objectives were filtered at different thresholds** (`r mf_manifest$min_txeco_n`), so their coefficients are not straightforwardly comparable with each other. The filtering log in `2_make_DART_results.Rmd` records what each threshold cost.
+* **One model per objective, never one across objectives.** A pooled intercept over a `decrease_*` and an `increase_*` objective would average opposite intended signs.
+* **No spatial or temporal autocorrelation term.** Pixels inside a polygon are close together and observed in consecutive years, and nothing in these models accounts for that beyond the polygon and pixel random intercepts. This is the most likely reason a fixed effect above looks more precise than it is, and it is unfinished business carried over from KY's original scripts, which close on `ape::Moran.I` and `stats::acf`.
+* **`us_l4name` enters as a fixed effect while `polygon` is a random intercept.** Every polygon sits in exactly one ecoregion, so the two are nested rather than crossed, and whether ecoregion belongs as a fixed effect, as a third random grouping, or as the level at which treatment effects are allowed to vary is an open question rather than a settled choice.
+
+## References
+
+Bates, D., Mächler, M., Bolker, B. and Walker, S. (2015). Fitting Linear Mixed-Effects Models Using lme4. *Journal of Statistical Software* **67**(1), 1–48. doi:10.18637/jss.v067.i01
+
+This is the source for every inference choice in this stage, not background reading: the likelihood ratio tests over the nested ladder, the `confint()` method and what the alternatives would cost, the decision to represent a boundary fit rather than fail on it, the sequential decomposition reported without p values, the diagnostic plots, and the posterior predictive check. Each section's citation sits with the output it justifies rather than being collected here, so that a reader who only wants one table does not have to come looking. Section numbers are that paper's own; **page numbers are the printed journal pages, which coincide with the PDF pages, and a paragraph number counts body-text paragraphs on that page, not counting headings, displayed equations, code blocks or captions.**
+
+Five further works are named above because particular statements rest on them, all of them reached through Bates et al. rather than consulted independently — which is why they are named in the text rather than cited as though this document had used them directly. They are Satterthwaite (1946) and Kenward and Roger (1997) for the degrees-of-freedom approximations the p-value discussion calls ad hoc, Bolker *et al.* (2013) for convergence warnings on an unconstrained reparameterisation, Laird and Ware (1982) for the REML criterion, and Gelman and Hill (2006) for posterior predictive simulation. Full entries for all of them, together with the R and package versions this run used, are in `../references/references.txt`.
+
+Nothing else is cited. The DART stage that produced this document's response variable, the filtering that produced its sample and the weighting decision carried forward in the caveats are all documented inside this project rather than in the literature.

@@ -9,7 +9,7 @@
 #
 # Moved 07 October 2026 after a reachability check over the live documents
 # (0_DART_setup.R, the three 2_*.Rmd, 3_make_linear_models.R and
-# 3_report_linear_models.Rmd, following calls between functions as well as
+# 3_report_lme4_models.Rmd, following calls between functions as well as
 # calls from the documents) found nothing reaching either of them.
 #
 #   make_excl_table()    was helper_functions.R. Built the cumulative

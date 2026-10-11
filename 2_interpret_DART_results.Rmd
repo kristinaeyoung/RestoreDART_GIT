@@ -1,0 +1,530 @@
+---
+title: "RestoreDART results, organized by finding"
+author: "BEM"
+date: "October 2026"
+output: html_document
+---
+
+## Notes
+
+* This document reports the same analysis as `2_make_DART_results.Rmd` organized a different way. That document is ordered by the quantity computed - overall significance, then per-polygon, then timing, then overlap - which is the order the tables were built in. This one is ordered by the four findings those quantities support, in the order KY proposed in `analysis_modification_suggestions_08102026`: whether treatments worked, which treatments worked, how long the effects lasted, and what else changed. It is the document the manuscript Results are written from.
+* Nothing here is a new analysis. Every number below is read off the same compiled tables the other documents display, and the four figures are new views of those tables rather than new estimates. Where this document departs from the other, it is in what gets foregrounded and what gets qualified, not in what was computed.
+* Nothing in this document computes what it displays, and nothing here sets a threshold. `2_results_setup.R` does both, for all four documents at once.
+* The per-objective detail behind every section - the sample sizes, what each filter removed, and each objective's own interpretation - is in `2_sample_size_checks.Rmd`. The per-ecoregion reference panels are in `2_raw_result_graphs.Rmd`. The pooled models are a separate stage, in `3_make_linear_models.R` and `3_report_lme4_models.Rmd`, and are not reported here.
+* Model-written interpretation is marked `CLAUDE:` at the start of the bullet. Unmarked bullets are BEM's.
+
+```{r setup, message = F, warning = F, echo = F}
+# Everything is computed in the shared setup script. `local = knitr::knit_global()`
+# is load-bearing: collect_obj_tables() looks for the per-objective tables in
+# `ls(envir = parent.frame())`, which from a chunk is the knit environment, so
+# that is where the script's objects have to land.
+#
+# This document reads six of the nine compiled tables, plus `nontarget_all`,
+# which the setup script builds from the three cross-objective direction checks.
+# It assigns nothing the other documents do not already have access to, so a
+# number quoted here and the same number quoted there cannot disagree.
+source('2_results_setup.R', local = knitr::knit_global())
+
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+```
+
+```{r interp-0_compile, echo = F}
+# The compiled cross-objective tables, gathered from the per-objective copies
+# the setup script assigned. Same call the other documents make.
+int_effect_all  <- collect_obj_tables('int_effect_')
+sig_overall_all <- collect_obj_tables('sig_overall_')
+poly_sig_all    <- collect_obj_tables('poly_sig_')
+peak_effect_all <- collect_obj_tables('peak_effect_')
+sig_by_bin_all  <- collect_obj_tables('sig_by_bin_')
+overlap_tbl_all <- collect_obj_tables('overlap_tbl_')
+summary_tbl_all <- collect_obj_tables('summary_tbl_')
+filter_log_all  <- collect_obj_tables('filter_log_')
+
+# Intended-effect rate by treatment and by ecoregion, within objective. One
+# helper with a column argument rather than two, and the same definition the
+# per-objective sections use - see summarize_intended_by_group().
+tx_tbl  <- summarize_intended_by_group(summary_tbl_all, 'tx_coarse')
+eco_tbl <- summarize_intended_by_group(summary_tbl_all, 'us_l4name')
+
+# Objectives ranked by intended-effect rate. This ordering is used by three of
+# the four figures and by the prose, so it is resolved once here rather than
+# re-sorted in each place.
+obj_rank <- int_effect_all[order(-int_effect_all$pct_sig_int), ]
+obj_lev  <- obj_cover_label(obj_rank)
+```
+
+```{r interp-0_stats, echo = F}
+# Scalars the hand-written prose quotes. Computed here rather than typed in, so
+# the text cannot drift from the tables above it, while the prose itself stays
+# plain markdown.
+
+# ---- finding 1: effectiveness by objective
+n_obj     <- nrow(int_effect_all)
+best_obj  <- obj_rank[1, ]
+worst_obj <- obj_rank[n_obj, ]
+int_fold  <- max(int_effect_all$pct_sig_int) / min(int_effect_all$pct_sig_int)
+# The objectives whose UNINTENDED share exceeds their intended share. This is
+# the reversal the dumbbell figure is drawn to show, so it is counted rather
+# than asserted.
+rev_obj   <- int_effect_all[int_effect_all$pct_sig_und > int_effect_all$pct_sig_int, ]
+# Where the best objective's sample sits among the five. Computed rather than
+# asserted: the highest intended rate and the largest analysis set are NOT the
+# same combination here, and calling the best result the best-sampled one
+# because both are large is the kind of claim that survives a read-through.
+size_ord  <- c('largest', 'second largest', 'third largest', 'fourth largest', 'smallest')
+best_n_rk <- match(best_obj$objective, int_effect_all$objective[order(-int_effect_all$n_pix)])
+
+# Standalone share of each objective's pixels, from the overlap table's 'none'
+# row, and the largest co-occurring objective for each.
+solo <- overlap_tbl_all[overlap_tbl_all$co_occurring_objective == 'none', ]
+solo <- solo[order(-solo$pct_pix), ]
+co_top <- do.call(rbind, lapply(split(overlap_tbl_all, overlap_tbl_all$objective), function(d_0) {
+  d_1 <- d_0[d_0$co_occurring_objective != 'none', ]
+  d_1[which.max(d_1$pct_pix), c('objective', 'co_occurring_objective', 'pct_pix')]
+}))
+afg_solo <- solo$pct_pix[solo$objective == 'decrease_afg']
+afg_pfg  <- overlap_tbl_all$pct_pix[overlap_tbl_all$objective == 'decrease_afg' &
+                                    overlap_tbl_all$co_occurring_objective == 'increase_pfg']
+
+# ---- finding 2: treatment method
+# Best and worst treatment within each objective, plus where prescribed burn
+# alone lands. Ranked on the same pixel-weighted rate the figure is filled by.
+tx_rank <- do.call(rbind, lapply(split(tx_tbl, tx_tbl$objective), function(d_0) {
+  d_0 <- d_0[order(-d_0$pct_int), ]
+  data.frame(
+    objective = d_0$objective[1],
+    n_tx      = nrow(d_0),
+    top_tx    = d_0$tx_coarse[1],
+    top_pct   = d_0$pct_int[1],
+    top_n     = d_0$n_pix[1],
+    burn_rank = match('prescribed burn', d_0$tx_coarse),
+    burn_pct  = d_0$pct_int[match('prescribed burn', d_0$tx_coarse)],
+    stringsAsFactors = F
+  )
+}))
+tx_burn <- tx_rank[!is.na(tx_rank$burn_rank), ]
+# Burn alone in the bottom three of every objective it appears in?
+burn_bot3 <- all(tx_burn$burn_rank > tx_burn$n_tx - 3)
+
+tx_cell <- function(obj, tx) {
+  r_0 <- tx_tbl[tx_tbl$objective == obj & tx_tbl$tx_coarse == tx, ]
+  if (nrow(r_0) == 0) return(NA_real_)
+  r_0$pct_int[1]
+}
+sv_tre  <- tx_cell('decrease_tre', 'seeding;vegetation removal')
+vr_tre  <- tx_cell('decrease_tre', 'vegetation removal')
+pb_tre  <- tx_cell('decrease_tre', 'prescribed burn')
+sv_pfg  <- tx_cell('increase_pfg', 'seeding;vegetation removal')
+pb_pfg  <- tx_cell('increase_pfg', 'prescribed burn')
+# The increase_shr exception: the two large seeding classes, which run the other
+# way from every other objective.
+shr_seed   <- tx_tbl[tx_tbl$objective == 'increase_shr' & tx_tbl$tx_coarse == 'seeding', ]
+shr_seedsd <- tx_tbl[tx_tbl$objective == 'increase_shr' & tx_tbl$tx_coarse == 'seeding;soil disturbance', ]
+shr_top    <- tx_rank[tx_rank$objective == 'increase_shr', ]
+
+# ---- finding 3: time
+# Intent resolved per row, against that row's own objective, rather than by
+# pooling an intended column across objectives.
+bin <- sig_by_bin_all
+bin_pos <- intended_dir_word(bin$objective) == 'positive'
+bin$pct_int <- ifelse(bin_pos, bin$mean_pct_sig_pos, bin$mean_pct_sig_neg)
+bin$pct_uni <- ifelse(bin_pos, bin$mean_pct_sig_neg, bin$mean_pct_sig_pos)
+# Recovered rather than assumed, for the reason given in plot_year_bin_lines():
+# `year_bin` is a factor with the right levels when it comes from the setup
+# script, but plain character when a table is read back from the written .csv,
+# and the labels sort alphabetically to 1-5, 11-15, 16+, 6-10 - which would make
+# `bin_last` the 6-10 bin and quietly invert every claim in this section.
+bin_lev <- if (is.factor(bin$year_bin)) levels(bin$year_bin) else {
+  u_0 <- unique(as.character(bin$year_bin))
+  u_0[order(as.numeric(sub('[^0-9].*$', '', u_0)))]
+}
+bin_first <- bin_lev[1]
+bin_last  <- bin_lev[length(bin_lev)]
+
+bin_ends <- do.call(rbind, lapply(split(bin, bin$objective), function(d_0) {
+  f_0 <- d_0[d_0$year_bin == bin_first, ]
+  l_0 <- d_0[d_0$year_bin == bin_last, ]
+  data.frame(
+    objective  = d_0$objective[1],
+    sig_first  = f_0$mean_pct_sig, sig_last = l_0$mean_pct_sig,
+    int_first  = f_0$pct_int,      int_last = l_0$pct_int,
+    uni_first  = f_0$pct_uni,      uni_last = l_0$pct_uni,
+    stringsAsFactors = F
+  )
+}))
+bin_ends$sig_retained <- round(100 * bin_ends$sig_last / bin_ends$sig_first, 0)
+bin_ends$ratio_first  <- bin_ends$int_first / bin_ends$uni_first
+bin_ends$ratio_last   <- bin_ends$int_last  / bin_ends$uni_last
+
+# Counted rather than asserted: how many objectives decline in every successive
+# bin, on the overall rate and on the intended rate.
+mono <- function(col) sum(sapply(split(bin, bin$objective), function(d_0) {
+  d_0 <- d_0[order(match(d_0$year_bin, bin_lev)), ]
+  all(diff(d_0[[col]]) < 0)
+}))
+n_mono_sig <- mono('mean_pct_sig')
+n_mono_int <- mono('pct_int')
+# And the objectives whose unintended rate ends HIGHER than it started.
+uni_up <- bin_ends$objective[bin_ends$uni_last > bin_ends$uni_first]
+
+# ---- the peak-timing evidence, which is why the year bins carry the argument
+pk_thin <- peak_effect_all[peak_effect_all$peak_n_pix < 50, ]
+pk_cens <- peak_effect_all[peak_effect_all$is_censored, ]
+
+# ---- finding 4: non-target responses and ecoregional variation
+nt_tre <- nontarget_all[nontarget_all$objective == 'decrease_tre', ]
+nt_tre <- nt_tre[order(-nt_tre$pct_sig), ]
+
+# For each objective: the highest-rate ecoregion with its sample size and share
+# of the objective's pixels, and the largest ecoregion by pixel count. The point
+# of the pairing is that the two are rarely the same cell.
+eco_ex <- do.call(rbind, lapply(split(eco_tbl, eco_tbl$objective), function(d_0) {
+  tot <- sum(d_0$n_pix)
+  hi  <- d_0[which.max(d_0$pct_int), ]
+  big <- d_0[which.max(d_0$n_pix), ]
+  data.frame(
+    objective = d_0$objective[1],
+    n_eco     = nrow(d_0),
+    hi_eco    = hi$us_l4name,  hi_pct  = hi$pct_int,  hi_n  = hi$n_pix,
+    hi_share  = round(100 * hi$n_pix / tot, 2),
+    big_eco   = big$us_l4name, big_pct = big$pct_int, big_n = big$n_pix,
+    big_share = round(100 * big$n_pix / tot, 2),
+    rng       = max(d_0$pct_int) - min(d_0$pct_int),
+    stringsAsFactors = F
+  )
+}))
+# How often the extreme cell is also a thin one: the rank of the highest-rate
+# ecoregion by pixel count, out of that objective's ecoregions.
+eco_ex$hi_rank_n <- mapply(function(obj, eco) {
+  d_0 <- eco_tbl[eco_tbl$objective == obj, ]
+  match(eco, d_0$us_l4name[order(-d_0$n_pix)])
+}, eco_ex$objective, eco_ex$hi_eco)
+
+# ---- scope, for the opening paragraph
+n_pix_tot  <- sum(int_effect_all$n_pix)
+n_poly_tot <- sum(poly_sig_all$n_polygons)
+pct_lost_rng <- range(filter_log_all$pct_pix_lost)
+```
+
+## Scope and terminology
+
+```{r interp-0_scope, echo = F}
+knitr::kable(
+  filter_log_all[, c('objective', 'cover', 'min_txeco_n', 'n_combo_excluded',
+                     'year_trunc_at', 'n_year_dropped', 'pct_pix_lost')],
+  col.names = c('Objective', 'Cover', 'Min. Pixels per Tx x Ecoregion',
+                '# Combinations Excluded', 'Truncated From Year',
+                '# Years Dropped', '% Pixels Lost (All Filters)'),
+  caption = 'What the three sample-size filters cost each objective by cover response. Read before comparing objectives to each other: the thresholds differ by objective, so every compiled table below is built on unequally filtered samples.',
+  digits = 2
+)
+```
+
+The analysis set is **`r format(n_pix_tot, big.mark = ',')` pixels** across `r n_obj` objective by cover response combinations, contributed by `r format(n_poly_tot, big.mark = ',')` polygon-by-objective records. The three sample-size filters removed between `r sprintf('%.2f', pct_lost_rng[1])`% and `r sprintf('%.2f', pct_lost_rng[2])`% of each combination's pixels, so the filtering is a guard rather than a selection step and none of the findings below rests on it.
+
+Two words are used throughout for two different things. **Positive** and **negative** refer to the raw sign of the differenced RAP cover effect, independent of any objective. **Intended** and **unintended** refer to that same sign read against the objective's management goal, so a negative effect is intended under a `decrease_*` objective and a positive effect is intended under an `increase_*` one. `get_intended_sign()` is the single source of that mapping. The distinction matters for every figure below, and it is why two of them are drawn in green and purple and one in red and blue: intent and raw sign are different questions and are deliberately not given the same colours.
+
+---
+
+## 1. Treatment effectiveness differed strongly among management objectives
+
+The first question a reader asks of a treatment evaluation is whether treatments moved vegetation the way managers intended. They did, in four of the five objectives, and by amounts that differ by more than fourfold between the best and worst.
+
+```{r interp-1_fig, echo = F, fig.width = 9, fig.height = 5}
+plot_intended_dumbbell(
+  int_effect_all,
+  # Kept short deliberately: a subtitle long enough to need wrapping is clipped
+  # at the panel's right edge rather than wrapped, and the full statement
+  # belongs in the caption below the figure anyway.
+  subtitle = 'Post-filter pixels, split by effect direction relative to the objective'
+)
+```
+
+**Figure.** X axis: percentage of that objective by cover response combination's post-filter pixels carrying a significant DART effect. Y axis: the objective and its cover response, ordered by the intended-effect rate so the figure reads top to bottom as a ranking. Colour: whether the effect was intended or unintended, resolved against each objective's own goal through `get_intended_sign()`. The two points on a row are joined by a line whose direction, not only its length, carries meaning: a line running left-to-right from unintended to intended marks an objective whose intended effects dominate, and the one reversed line marks the objective where they do not. The right-hand text columns give the intended-to-unintended ratio and the pixel count for that row. Sample size is printed rather than mapped to point size, because the counts span an order of magnitude and point area would swamp the horizontal comparison the figure exists to make. No error bars: these are shares of a population of pixels, not estimates with a sampling distribution.
+
+```{r interp-1_tbl, echo = F}
+knitr::kable(
+  int_effect_all[order(-int_effect_all$pct_sig_int), ],
+  col.names = c('Objective', 'Cover', 'Total Pixels', '% Significant',
+                '% Significant (Intended)', '% Significant (Unintended)'),
+  caption = 'Significance rates by objective by cover response, with the overall rate split into intended and unintended shares of all pixels. The two shares sum to the overall rate up to rounding. Rows are ordered by the intended rate.',
+  digits = 2, row.names = FALSE
+)
+```
+
+```{r interp-1_interp, echo = F}
+interp_1 <- c(
+  paste0("- CLAUDE: Treatment effectiveness spans a ", sprintf('%.1f', int_fold),
+         "-fold range across objectives evaluated in the same framework. ",
+         best_obj$objective, " is the clearest success at ",
+         sprintf('%.1f', best_obj$pct_sig_int), "% intended against ",
+         sprintf('%.1f', best_obj$pct_sig_und), "% unintended, on ",
+         format(best_obj$n_pix, big.mark = ','), " pixels - the ",
+         size_ord[best_n_rk], " of the ", n_obj, " analysis sets. The ranking is ",
+         "therefore not an artefact of thin samples at the top, which is worth ",
+         "stating because it is the opposite of the pattern in the ecoregion ",
+         "breakdown further down."),
+  paste0("- CLAUDE: ", worst_obj$objective, " is the exception, and it reverses: ",
+         sprintf('%.1f', worst_obj$pct_sig_int), "% of its pixels moved as intended against ",
+         sprintf('%.1f', worst_obj$pct_sig_und), "% that moved the opposite way. ",
+         "Significant increases in annual forb and grass cover were about ",
+         sprintf('%.1f', worst_obj$pct_sig_und / worst_obj$pct_sig_int),
+         " times as common as significant decreases where reducing that cover ",
+         "was an assigned goal."),
+  paste0("- CLAUDE: That reversal should not be read as \"annual grass treatments ",
+         "backfire\". Only ", sprintf('%.2f', afg_solo), "% of decrease_afg pixels carry ",
+         "no other objective, and ", sprintf('%.2f', afg_pfg), "% also carry the ",
+         "increase_pfg objective, so the ground being evaluated is almost entirely ",
+         "ground being managed toward a second goal at the same time. The result is ",
+         "real within this analysis - the unintended direction dominates in every ",
+         "time bin, not just on average - but what it describes is the annual ",
+         "component of compound-objective projects, not a treatment aimed at annual ",
+         "grasses alone."),
+  "- To be written."
+)
+```
+
+`r paste(interp_1, collapse = '\n')`
+
+---
+
+## 2. Treatment method was a major determinant of intended vegetation change
+
+Treatment combination separates intended-effect rates more sharply than any other covariate examined descriptively, and it separates them in a direction that is consistent across most objectives: seeding paired with mechanical vegetation removal at one end, prescribed burning alone at the other.
+
+```{r interp-2_fig, echo = F, fig.width = 10, fig.height = 7}
+plot_tx_objective_heatmap(
+  tx_tbl, obj_levels = obj_lev,
+  subtitle = 'Rows ordered by mean rate; empty cells are combinations not used'
+)
+```
+
+**Figure.** X axis: objective and cover response, ordered by overall intended-effect rate, so the columns run left to right in the ranking of Figure 1. Y axis: harmonized treatment combination, ordered by that treatment's mean intended rate across the objectives it appears in rather than alphabetically, which is what makes the seeding and mechanical-removal combinations cluster toward the top and prescribed burn alone toward the bottom. Fill: the percentage of that cell's pixels carrying a significant intended effect, pixel-weighted within the objective and summed over ecoregions. The rate and the pixel count are both printed in the cell; an empty cell is a combination not used for that objective, which is a different thing from a rate of zero and is drawn differently. No facets. The count is printed rather than encoded, because the counts span four orders of magnitude and the reason to show them is to let a reader discount a high rate resting on a thin cell.
+
+```{r interp-2_tbl, echo = F}
+tx_show <- tx_tbl[, c('objective', 'cover', 'tx_coarse', 'n_pix', 'n_sig_int', 'pct_int')]
+tx_show <- tx_show[order(match(tx_show$objective, obj_rank$objective), -tx_show$pct_int), ]
+knitr::kable(
+  tx_show, format = 'html', row.names = FALSE,
+  col.names = c('Objective', 'Cover', 'Treatment Combination', 'Total Pixels',
+                '# Significant (Intended)', '% Significant (Intended)'),
+  caption = 'Intended-effect rate by treatment combination within each objective, pixel-weighted and summed over ecoregions. Objectives are in the order of Figure 1 and treatments are ranked within each. A rule separates objectives.',
+  digits = 2
+) |> style_kable_rows(group = tx_show$objective)
+```
+
+```{r interp-2_interp, echo = F}
+interp_2 <- c(
+  paste0("- CLAUDE: The cleanest comparison is within tree reduction, where the three ",
+         "largest treatment classes separate by a factor of four: seeding with ",
+         "vegetation removal at ", sprintf('%.1f', sv_tre), "% intended, vegetation ",
+         "removal alone at ", sprintf('%.1f', vr_tre), "%, and prescribed burn alone at ",
+         sprintf('%.1f', pb_tre), "%. The same pairing leads perennial herbaceous ",
+         "increase at ", sprintf('%.1f', sv_pfg), "% against ", sprintf('%.1f', pb_pfg),
+         "% for burning alone. How a treatment was implemented is at least as ",
+         "consequential as which outcome it targeted."),
+  paste0("- CLAUDE: Prescribed burn alone falls in the bottom three treatments for ",
+         if (burn_bot3) "all " else "most of the ", nrow(tx_burn),
+         " objectives in which it occurs, at rates of ",
+         paste(sprintf('%.1f', sort(tx_burn$burn_pct)), collapse = ', '),
+         "%. It is also among the best-sampled treatments, so the result is not a ",
+         "thin-cell artefact."),
+  paste0("- CLAUDE: increase_shr does not follow the pattern and the exception is worth ",
+         "keeping rather than smoothing. Its highest nominal rate is ",
+         sprintf('%.1f', shr_top$top_pct), "% for ", shr_top$top_tx, ", on only ",
+         format(shr_top$top_n, big.mark = ','), " pixels; and among the two large ",
+         "seeding classes the ordering reverses, with seeding alone at ",
+         sprintf('%.2f', shr_seed$pct_int), "% (", format(shr_seed$n_pix, big.mark = ','),
+         " pixels) ahead of seeding with soil disturbance at ",
+         sprintf('%.2f', shr_seedsd$pct_int), "% (",
+         format(shr_seedsd$n_pix, big.mark = ','), " pixels). Shrub establishment ",
+         "responding differently to soil disturbance than herbaceous establishment ",
+         "does is a plausible reading, and it is also exactly the kind of claim that ",
+         "needs the pooled model rather than this table."),
+  paste0("- CLAUDE: Nothing here establishes that a combination is more than the sum ",
+         "of its components. The treatments are compared as categories, so a ",
+         "seeding-plus-removal rate above both single-component rates is consistent ",
+         "with synergy and equally consistent with additivity. Testing that requires ",
+         "re-expressing the combinations as component indicators and estimating their ",
+         "interaction, which is a model, not a cross-tabulation."),
+  "- To be written."
+)
+```
+
+`r paste(interp_2, collapse = '\n')`
+
+---
+
+## 3. Intended effects weakened with time since treatment
+
+This is the most general result in the analysis: it holds in every objective, on both the overall significance rate and the intended rate, and it is the one finding that does not depend on which objective or treatment is being examined.
+
+```{r interp-3_fig, echo = F, fig.width = 9, fig.height = 6}
+plot_year_bin_lines(
+  sig_by_bin_all,
+  subtitle = 'Intended and unintended rates by years-since-treatment bin, shared y axis'
+)
+```
+
+**Figure.** X axis: years-since-treatment bin, in order. Y axis: percentage of that bin's pixels carrying a significant effect, on a scale shared across all panels. Colour: intended or unintended, resolved per panel against that objective's own goal, so a `decrease_*` panel's intended line is its negative rate and an `increase_*` panel's is its positive rate. Facets: objective by cover response. The shared y axis is the point of the figure - the claim is that every panel declines and that in two of them the unintended line rises toward the intended one, and free scales would turn five related panels into five unrelated ones. Bin sample sizes are in the table below rather than on the figure.
+
+```{r interp-3_tbl, echo = F}
+bin_show <- bin[order(match(bin$objective, obj_rank$objective),
+                      match(bin$year_bin, bin_lev)),
+                c('objective', 'cover', 'year_bin', 'n_pix', 'mean_pct_sig',
+                  'pct_int', 'pct_uni')]
+knitr::kable(
+  bin_show, format = 'html', row.names = FALSE,
+  col.names = c('Objective', 'Cover', 'Years Since Treatment', 'Total Pixels',
+                '% Significant', '% Significant (Intended)', '% Significant (Unintended)'),
+  caption = 'Significance rates by years-since-treatment bin, with the overall rate split into intended and unintended shares. Objectives are in the order of Figure 1. A rule separates objectives.',
+  digits = 2
+) |> style_kable_rows(group = bin_show$objective)
+```
+
+```{r interp-3_interp, echo = F}
+interp_3 <- c(
+  paste0("- CLAUDE: The overall significance rate declines across every successive bin in ",
+         n_mono_sig, " of ", n_obj, " objectives, and the intended rate in ",
+         n_mono_int, " of ", n_obj, ". By the ", bin_last, " bin the overall rate stands at ",
+         min(bin_ends$sig_retained), "-", max(bin_ends$sig_retained),
+         "% of its ", bin_first, " value. No objective is exempt, which makes this the ",
+         "one finding here that does not need an objective or a treatment attached to it."),
+  paste0("- CLAUDE: The more interesting layer is that in ", length(uni_up), " objectives - ",
+         paste(uni_up, collapse = ' and '), " - the unintended rate RISES while the ",
+         "intended rate falls. For decrease_tre the intended-to-unintended ratio collapses from ",
+         sprintf('%.1f', bin_ends$ratio_first[bin_ends$objective == 'decrease_tre']), ":1 to ",
+         sprintf('%.1f', bin_ends$ratio_last[bin_ends$objective == 'decrease_tre']), ":1, and for ",
+         "increase_pfg from ",
+         sprintf('%.1f', bin_ends$ratio_first[bin_ends$objective == 'increase_pfg']), ":1 to ",
+         sprintf('%.1f', bin_ends$ratio_last[bin_ends$objective == 'increase_pfg']), ":1. ",
+         "That is a different statement from \"effects fade\": the treated ground does not ",
+         "become quiet, it becomes as likely to move against the objective as with it."),
+  paste0("- CLAUDE: These bins, not the annual peak magnitudes, are what the temporal ",
+         "argument should rest on. Of the ", nrow(peak_effect_all), " peak estimates in the ",
+         "peak-effect table, ", nrow(pk_thin), " rest on fewer than 50 significant pixels and ",
+         nrow(pk_cens), " is censored at the last observed year. A peak year computed from a ",
+         "handful of pixels is a statement about those pixels, not about when treatment ",
+         "effects were largest."),
+  "- To be written."
+)
+```
+
+`r paste(interp_3, collapse = '\n')`
+
+```{r interp-3_peak, echo = F}
+pk_show <- peak_effect_all
+pk_show$thin <- ifelse(pk_show$peak_n_pix < 50, '*', '')
+knitr::kable(
+  pk_show[, c('objective_cover', 'direction', 'peak_year', 'peak_effect',
+              'peak_se', 'peak_n_pix', 'last_year', 'is_censored', 'thin')],
+  format = 'html', row.names = FALSE,
+  col.names = c('Objective (Cover)', 'Direction', 'Peak Year', 'Peak Mean Effect',
+                'SE', '# Significant Pixels', 'Last Year', 'Censored', '< 50 px'),
+  caption = 'Peak mean effect over significant pixels, by objective and direction. Shown to document why the year-bin analysis above carries the temporal argument instead: a starred row rests on fewer than 50 significant pixels, and a censored row peaks on the last observed year, so its peak may simply be where the record stops. SE is blank where the peak rests on a single pixel.',
+  digits = 2
+)
+```
+
+---
+
+## 4. Treatments produced broader community responses, and outcomes varied in space
+
+### Non-target cover responses
+
+Treating one functional group did not leave the others alone. In pixels where a given objective was being pursued, the non-target cover responses carried significance rates comparable to the target response.
+
+```{r interp-4_fig, echo = F, fig.width = 9, fig.height = 5}
+plot_nontarget_fingerprint(
+  nontarget_all,
+  subtitle = 'Significant increases above the line, significant decreases below; unfiltered denominators'
+)
+```
+
+**Figure.** X axis: the non-target cover response, which differs by panel because each objective has its own set of responses worth asking about. Y axis: percentage of that response's pixels carrying a significant effect, with significant increases plotted above the zero line and significant decreases below it, and the axis labelled in absolute values; the scale is shared across panels. Fill: raw sign of the effect, in the same red and blue every raw-sign figure in this project uses. Facets: the objective being pursued in those pixels. Raw sign rather than intent is forced here rather than chosen - a non-target response has no assigned objective against which a sign could be called intended. The sample sizes are the **unfiltered** post-treatment pixel counts for that objective, which is also why these percentages must not be compared numerically with the filtered intended-effect rates in Figure 1.
+
+```{r interp-4_tbl_nt, echo = F}
+knitr::kable(
+  nontarget_all,
+  col.names = c('Objective Pursued', 'Cover Response', 'Total Pixels', '% Significant',
+                '% Significant Positive', '% Significant Negative'),
+  caption = 'Non-target cover responses in treated pixels, by the objective being pursued. Denominators are the full post-treatment data for that objective, not the post-filter analysis set, so these rates are not comparable with the compiled tables above.',
+  digits = 2, row.names = FALSE
+)
+```
+
+### Ecoregional variation
+
+```{r interp-4_tbl_eco, echo = F}
+knitr::kable(
+  eco_ex[, c('objective', 'n_eco', 'rng', 'hi_eco', 'hi_pct', 'hi_n', 'hi_share',
+             'hi_rank_n', 'big_eco', 'big_pct', 'big_n')],
+  format = 'html', row.names = FALSE,
+  col.names = c('Objective', '# Ecoregions', 'Range of Rates', 'Highest-Rate Ecoregion',
+                '% Intended', 'Pixels', '% of Objective', 'Rank by Size',
+                'Largest Ecoregion', '% Intended', 'Pixels'),
+  caption = 'For each objective: the spread of intended-effect rates across Level IV ecoregions, the ecoregion with the highest rate alongside its sample size and its rank among that objective\'s ecoregions by pixel count, and the largest ecoregion for comparison. The pairing is the point - the extreme cell and the well-sampled cell are rarely the same one.',
+  digits = 2
+)
+```
+
+```{r interp-4_interp, echo = F}
+hi_pfg <- eco_ex[eco_ex$objective == 'increase_pfg', ]
+interp_4 <- c(
+  paste0("- CLAUDE: Where tree reduction was the objective, significant responses ",
+         "occurred in ", paste(sprintf('%.1f%% of %s', nt_tre$pct_sig, nt_tre$fun_group),
+                               collapse = ', '),
+         " observations, rates comparable to the target response itself, and the ",
+         "perennial and annual herbaceous responses were dominated by increases. ",
+         "Removing trees did not simply reduce tree cover; it restructured the ",
+         "herbaceous community, in a desirable direction and an undesirable one at ",
+         "the same time. That is the tradeoff the Introduction sets up, measured."),
+  paste0("- CLAUDE: Ecoregional variation is large - within a single objective the ",
+         "intended rates of the best and worst ecoregion differ by between ",
+         sprintf('%.1f', min(eco_ex$rng)), " and ", sprintf('%.1f', max(eco_ex$rng)),
+         " percentage points - but the extremes sit on small ",
+         "samples. The clearest case is ", hi_pfg$hi_eco, ", which reaches ",
+         sprintf('%.1f', hi_pfg$hi_pct), "% intended for increase_pfg on ",
+         format(hi_pfg$hi_n, big.mark = ','), " pixels, ", sprintf('%.2f', hi_pfg$hi_share),
+         "% of that objective's analysis set. The largest ecoregion in the same ",
+         "objective, ", hi_pfg$big_eco, ", sits at ", sprintf('%.1f', hi_pfg$big_pct),
+         "% on ", format(hi_pfg$big_n, big.mark = ','), " pixels, far closer to the ",
+         "objective's overall rate."),
+  paste0("- CLAUDE: The defensible claim is therefore that outcomes were spatially ",
+         "heterogeneous and that the most extreme ecoregional estimates are the least ",
+         "well supported - not that treatments work better in one ecoregion than ",
+         "another. Separating those two statements needs partial pooling, which shrinks ",
+         "a thin ecoregion toward the overall mean while leaving a well-sampled one ",
+         "alone, and that is a model rather than a ranking."),
+  "- To be written."
+)
+```
+
+`r paste(interp_4, collapse = '\n')`
+
+---
+
+## Caveats carried by every number above
+
+```{r interp-5_overlap, echo = F}
+knitr::kable(
+  solo[, c('objective', 'cover', 'n_pix', 'pct_pix')],
+  col.names = c('Objective', 'Cover', 'Pixels With No Other Objective',
+                '% With No Other Objective'),
+  caption = 'The share of each objective\'s analysis pixels that carry no other management objective. Only decrease_tre has a substantial uniquely assigned component.',
+  digits = 2, row.names = FALSE
+)
+```
+
+* **Objective groupings are not a partition.** A pixel counts toward an objective if it fell in any part of that objective, so multi-objective treatments appear in several groupings and parts of the dataset are counted more than once. The table above makes that quantitative: outside `decrease_tre`, between `r sprintf('%.2f', min(solo$pct_pix[solo$objective != 'decrease_tre']))`% and `r sprintf('%.2f', max(solo$pct_pix[solo$objective != 'decrease_tre']))`% of an objective's pixels carry no second objective. The five analyses are five ways of interrogating overlapping restoration landscapes, not five independent experiments.
+* **An objective and response pairing is only included when the response cover type matches the objective's target cover**, with bare ground the sole exception, shown against all objectives. Mechanically that exception is inert in the current data, which carries no bare-ground rows, so no bare-ground result is reported anywhere here.
+* **Pixels are not independent replicates.** They are nested in treatment polygons and the polygon is the unit a manager acts on, so a pixel-weighted rate gives a large polygon more influence than a small one. Every rate above is pixel-weighted. The per-polygon tables in `2_make_DART_results.Rmd` carry the other framing, and the two have not been reconciled.
+* **Nothing above adjusts for anything.** These are marginal rates: the treatment comparison does not hold ecoregion or climate constant, the time comparison does not hold treatment constant, and no interval around any of them accounts for the nesting. Claims of the form "treatment A outperformed treatment B under otherwise comparable conditions" are not supported by this document.
+
+## What this document does not yet support
+
+KY's `analysis_modification_suggestions_08102026` proposes nine further analyses. Recorded here so that the gap between what is shown above and what the manuscript might claim is explicit, and so that the list does not have to be re-derived.
+
+* **Not addressed at all.** Formal treatment-component synergy tests; the objective-overlap sensitivity analysis re-running the headline results on single-objective and bundled subsets; a persistence analysis estimating time to 50% loss of the initial effect; climate as a moderator, separating long-term site aridity from post-treatment drought; partial-pooling estimates replacing the raw ecoregion rankings; a multivariate treatment of the non-target responses as response syndromes; and the robustness set (a common treatment by ecoregion threshold across objectives, and 90% against 95% uncertainty thresholds).
+* **Partly addressed elsewhere.** The hierarchical model of the continuous effect, with treatment, time, aridity, SPEI and ecoregion and a polygon random effect, has been fitted once and is reported in `3_report_lme4_models.Rmd`. It is a linear specification in time rather than the spline or piecewise form the suggestions call for, it does not carry the proposed interactions, and it is being revised, so nothing from it is quoted here or carried into the manuscript.
+* **A standing ambiguity the list makes sharper.** The pixel-weighted landscape rate and the polygon-weighted project rate answer different management questions - what fraction of treated land responded, against what the average treatment project achieved - and this document reports only the first. Which of the two the manuscript should lead with is a decision, not a calculation.

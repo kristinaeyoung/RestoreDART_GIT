@@ -924,3 +924,121 @@ summarize_sig_effect <- function(
   return(list(summary = grp_summary, plot = p0, baseline = baseline, pairwise = pairwise_df))
   
 }
+
+# Draw horizontal rules between groups of rows in an HTML kable, and optionally
+# bold whole rows.
+#
+# This exists because the report's grouped tables - the AIC ladder, the
+# likelihood ratio tests, the sequential decomposition - stack five objectives
+# into one table, and without a rule between them a reader has to track the
+# objective column to see where one ladder ends and the next begins. kableExtra
+# does this with pack_rows(), but it is not a dependency of this project and the
+# house rule is to ask before adding one, so this works on kable's own HTML
+# instead: the output is a predictable sequence of `  <tr>` lines inside
+# `<tbody>`, one per body row and in row order, so a style attribute can be
+# attached to the right ones without parsing HTML properly.
+#
+# Takes and returns a knitr_kable object, so it composes on the end of a
+# knitr::kable() call and still auto-prints at chunk top level (wrapping the
+# result in print() would break it, same as any other kable).
+#
+# `kbl`   a knitr::kable(..., format = 'html') object. The html format is
+#         required - the default pipe-table format carries no <tr> to style.
+# `group` a vector, one element per body row in table order; a rule is drawn
+#         above every row where this value differs from the row before it.
+# `bold`  a logical vector, one element per body row; TRUE renders that row's
+#         cells in bold.
+style_kable_rows <- function(kbl, group = NULL, bold = NULL) {
+
+  stopifnot(inherits(kbl, 'knitr_kable'))
+  if (!identical(attr(kbl, 'format'), 'html')) {
+    stop('style_kable_rows(): kbl must be built with knitr::kable(format = \'html\')')
+  }
+
+  ln <- strsplit(as.character(kbl), '\n', fixed = T)[[1]]
+
+  i_open  <- grep('<tbody>', ln, fixed = T)
+  i_close <- grep('</tbody>', ln, fixed = T)
+  stopifnot(length(i_open) == 1, length(i_close) == 1)
+
+  # One entry per body row, in the order kable emitted them.
+  i_tr <- grep('^\\s*<tr>\\s*$', ln)
+  i_tr <- i_tr[i_tr > i_open & i_tr < i_close]
+  n_row <- length(i_tr)
+
+  if (!is.null(group)) stopifnot(length(group) == n_row)
+  if (!is.null(bold))  stopifnot(length(bold)  == n_row)
+
+  # Where the grouping value changes. Never the first row - a rule above it
+  # would sit directly under the header rule and read as a stray line.
+  rule <- if (is.null(group)) rep(F, n_row) else
+    c(F, as.character(group)[-1] != as.character(group)[-n_row])
+
+  for (ii in seq_len(n_row)) {
+
+    if (rule[ii]) {
+      ln[i_tr[ii]] <- sub('<tr>', '<tr style="border-top: 2px solid #000;">',
+                          ln[i_tr[ii]], fixed = T)
+    }
+
+    if (!is.null(bold) && isTRUE(bold[ii])) {
+      # The cells of this row are the lines between its <tr> and the next one,
+      # or the closing </tbody> for the last row.
+      i_end <- if (ii < n_row) i_tr[ii + 1] else i_close
+      jj <- seq(i_tr[ii] + 1, i_end - 1)
+      ln[jj] <- sub('(<td[^>]*>)(.*)(</td>)', '\\1<strong>\\2</strong>\\3', ln[jj])
+    }
+  }
+
+  return(structure(paste(ln, collapse = '\n'), format = 'html',
+                   class = 'knitr_kable'))
+}
+
+summarize_intended_by_group <- function(summary_tbl_all, group_col) {
+
+  # Intended-effect rate by one grouping column WITHIN each objective, built
+  # from the compiled summary table. `group_col` is 'tx_coarse' or 'us_l4name';
+  # one function with a column argument rather than two near-identical ones,
+  # since the aggregation is the same and only the axis differs.
+  #
+  # This exists because the per-objective sections of 2_sample_size_checks.Rmd
+  # compute these rates inside each section (as `res_tx$summary` and
+  # `res_eco$summary`, via summarize_sig_effect()), so nothing cross-objective
+  # could read them without reaching into a section. The interpretation document
+  # needs the same quantity on a treatment x objective grid, and the
+  # `interp_stats` chunk of 2_make_DART_results.Rmd needs it to rank treatments,
+  # so it is written once here and read from both places. Checked against all
+  # five objectives: it reproduces `res_tx$summary$pct_sig` exactly.
+  #
+  # The definition is pixel-weighted and deliberately so: intended pixels over
+  # all pixels in that objective x group cell, summed over the OTHER grouping
+  # column first. That is a landscape rate - what fraction of treated ground
+  # responded as intended - and it gives a large polygon more influence than a
+  # small one. A polygon-weighted rate answers a different question and is not
+  # this function; see the per-polygon tables for that framing.
+  #
+  # Aggregating within one objective at a time is not a stylistic choice. The
+  # intended direction is defined against the objective's own goal, so summing
+  # intended counts across a decrease_* and an increase_* objective would add
+  # together opposite raw signs - which is also why the compiled tables keep the
+  # raw sign and only the per-objective views carry intent.
+
+  req <- c('objective', 'cover', 'grp_n_pix', 'grp_n_sig_int', group_col)
+  if (!all(req %in% colnames(summary_tbl_all))) {
+    stop('summarize_intended_by_group(): summary_tbl_all is missing ',
+         paste(setdiff(req, colnames(summary_tbl_all)), collapse = ', '))
+  }
+
+  fm <- stats::as.formula(paste('cbind(grp_n_pix, grp_n_sig_int) ~ objective + cover +',
+                                group_col))
+  a0 <- stats::aggregate(fm, data = summary_tbl_all, FUN = sum)
+
+  names(a0)[names(a0) == 'grp_n_pix']     <- 'n_pix'
+  names(a0)[names(a0) == 'grp_n_sig_int'] <- 'n_sig_int'
+  a0$pct_int <- round(100 * a0$n_sig_int / a0$n_pix, 2)
+
+  a0 <- a0[order(a0$objective, -a0$pct_int), ]
+  row.names(a0) <- NULL
+
+  return(a0)
+}

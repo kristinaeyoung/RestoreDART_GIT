@@ -77,15 +77,56 @@ source('helper_functions.R', local = environment())
 # describes. Grep both files for the stamp before changing either.
 in_stamp <- '10072026'
 
-fig_dir <- '../analysis_inputs/results/figures'
-out_dir <- '../analysis_inputs/results'
-in_fl   <- paste0('../analysis_inputs/RestoreDART_DATA/MIXED_MODELS/',
-                  '1_combined_filter_input_data_', in_stamp, '.csv')
+# Outputs moved out of ../analysis_inputs/results on 08 Oct 2026, when BEM added
+# ../analysis_outputs. That directory had been both an input and an output - it
+# held tx_key_BEM.csv, which 1_combine_filter_input_data.R reads, alongside
+# everything the renders write - and separating the two is the point of the new
+# directory. tx_key_BEM.csv stayed behind; everything generated moved.
+#
+# On 10 Oct 2026 the generated outputs were consolidated one step further, into
+# ONE date-stamped directory per run. Before that, ../analysis_outputs was flat:
+# the nine compiled .csv files, the render logs and an empty figures/ sat at the
+# top level, while the model stage wrote its own RestoreDART_model_run_<stamp>/
+# beside them - so the two halves of a single pass over the pipeline were in
+# different places and nothing recorded that they belonged together. The
+# retired values:
+#   fig_dir <- '../analysis_outputs/figures'
+#   out_dir <- '../analysis_outputs'
+#
+# `run_stamp` names the run directory, MMDDYYYY, and is a literal for the same
+# reason `in_stamp` is: a stamp derived from Sys.Date() moves on its own, so a
+# re-render meant to refresh an existing run would quietly start a new directory
+# and leave half that run - the model fits, the other two documents - behind in
+# the old one. Bump it deliberately when a run is to be kept separate from the
+# last; leave it alone to add to, or overwrite within, the current one.
+#
+# It currently equals `in_stamp` because the 07 Oct 2026 pass is the live run:
+# the model fits in that directory were made from this same input file, so a
+# document rendered now belongs beside them. The two stamps are separate
+# constants, though, and are not required to agree - a second run against an
+# unchanged input is exactly the case the run stamp exists to keep apart.
+run_stamp <- '10072026'
+
+out_root <- '../analysis_outputs'
+run_dir  <- file.path(out_root, paste0('RestoreDART_run_', run_stamp))
+out_dir  <- run_dir
+fig_dir  <- file.path(run_dir, 'figures')
+log_dir  <- file.path(run_dir, 'logs')
+in_fl    <- paste0('../analysis_inputs/RestoreDART_DATA/MIXED_MODELS/',
+                   '1_combined_filter_input_data_', in_stamp, '.csv')
+
+# Created rather than asserted, since a new `run_stamp` names a directory that
+# does not exist yet. `out_root` IS asserted - it is a grant point, not
+# something this script should invent, and a typo there would otherwise be
+# silently papered over by dir.create(recursive = T).
+stopifnot(dir.exists(out_root))
+for (d0 in c(run_dir, fig_dir, log_dir)) dir.create(d0, recursive = T, showWarnings = F)
+rm(d0)
 
 # Asserted rather than left to fail at the read: a wrong `in_fl` otherwise
 # surfaces as a read.csv() error several lines down, and a missing `out_dir`
 # not until the write_csv chunk at the very end of a three-minute render.
-stopifnot(file.exists(in_fl), dir.exists(out_dir), dir.exists(fig_dir))
+stopifnot(file.exists(in_fl), dir.exists(out_dir), dir.exists(fig_dir), dir.exists(log_dir))
 
 # Sample-size thresholds applied to each treatment x ecoregion combination, in
 # pixels. This is the ONLY place the thresholds are set. `default` applies to
@@ -521,3 +562,42 @@ rm(list = intersect(
     'overlap_tbl', 'n_time_obj', 'pct_time_obj', 'poly_by_tx', 'summary_tbl'),
   ls()
 ))
+
+# ---- non-target cover responses -----------------------------------------
+
+# The three cross-objective direction checks, stacked into one table with an
+# `objective` column. This asks what the OTHER cover responses did in pixels
+# where a given objective was being pursued - e.g. what AFG, SHR and PFG cover
+# did where the goal was to decrease tree cover - which split_by_objective()
+# cannot answer, because it only ever pairs an objective with its own matching
+# cover response.
+#
+# Computed here rather than in a document, like everything else. The three
+# calls have existed since the report was first written, but as chunks inside
+# 2_make_DART_results.Rmd, which made that document the one place a .Rmd
+# computed what it displayed - the same defect that moved `poly_sig_` into this
+# script on 07 Oct 2026. The interpretation document needs them stacked across
+# objectives for its community-response figure, so they are built once here and
+# both documents read the result.
+#
+# The cost falls on the two documents that display none of this: three grepl()
+# passes over `combined_df` and a grouped summarise, a few seconds each. That is
+# the price of the seam, and it is worth paying - the alternative is two
+# definitions of the same table drifting apart, which is what the `decrease_shb`
+# misspelling cost the first time these calls were written out by hand.
+#
+# Which non-target responses go with which objective is a judgement about what
+# is ecologically interesting, not something derivable from the data, so it is
+# written out as a list rather than generated: every cover response except the
+# objective's own target would include pairings nobody has a question about.
+nontarget_spec <- list(
+  decrease_tre = c('AFG', 'SHR', 'PFG'),
+  increase_pfg = c('AFG'),
+  decrease_shr = c('AFG', 'PFG', 'TRE')
+)
+
+nontarget_all <- do.call(rbind, lapply(names(nontarget_spec), function(i_obj) {
+  r_0 <- compare_related_directions(combined_df, i_obj, nontarget_spec[[i_obj]])
+  data.frame(objective = i_obj, r_0$table, stringsAsFactors = F)
+}))
+row.names(nontarget_all) <- NULL

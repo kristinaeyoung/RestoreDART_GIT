@@ -14,7 +14,7 @@
 # as a starting point to argue with, not as output.
 #
 # Results are written to a dated run directory under `out_dir` and are presented
-# to collaborators by `3_report_linear_models.Rmd`, which reads that directory
+# to collaborators by `3_report_lme4_models.Rmd`, which reads that directory
 # and refits nothing. The division of labour is the same one the report
 # documents use: this script computes, that document displays.
 #
@@ -220,17 +220,24 @@ n_resid_plot <- 20000
 
 # ---- output directory ---------------------------------------------------
 
-# One directory per run date, date-stamped MMDDYYYY to match the convention the
-# input file and the manuscript versions already use. Both `sig_only` settings
-# can share a date; they are told apart by `run_tag` in the filenames and by the
-# manifest written at the end.
+# `run_dir` is inherited from 2_results_setup.R, sourced above, which derives it
+# from `run_stamp` and has already created it. Nothing is set here.
 #
-# Deliberately NOT cleared on re-run: a second run on the same date overwrites
-# its own files and leaves the other setting's alone.
-run_dir <- file.path(out_dir, paste0('RestoreDART_model_run_',
-                                     format(Sys.Date(), '%m%d%Y')))
-dir.create(run_dir, recursive = T, showWarnings = F)
-stopifnot(dir.exists(run_dir))
+# It used to be derived in this script instead, as
+#   run_dir <- file.path(out_dir, paste0('RestoreDART_model_run_',
+#                                        format(Sys.Date(), '%m%d%Y')))
+# which put the model stage's outputs in a directory of their own, beside the
+# render stage's rather than with them, and dated them by the day the fits
+# happened rather than by the run they belong to. Those are the same thing only
+# until a post-processing failure is fixed the next morning. Taking the
+# directory from the setup script means the two stages cannot disagree about
+# where a run's outputs go, and that a run is one directory.
+#
+# Both `sig_only` settings still share the directory; they are told apart by
+# `run_tag` in every filename and by the manifest written at the end. It is
+# deliberately NOT cleared on re-run - a second run overwrites its own files and
+# leaves the other setting's alone.
+stopifnot(dir.exists(run_dir), exists('run_stamp'))
 
 # Where the fitted objects are cached. Fitting is the expensive step and every
 # table and figure below is cheap to rebuild from the fits, so they are saved
@@ -703,7 +710,7 @@ if (n_ppd > 0) {
 
 # Every figure is built through a function in `plot_functions.R`, like every
 # other figure in this project, and collected into one named list. The list is
-# written out as a single .Rdata so that `3_report_linear_models.Rmd` can load
+# written out as a single .Rdata so that `3_report_lme4_models.Rmd` can load
 # the plot objects and print them, and each element is also written as a .png
 # for pasting into slides and mail.
 #
